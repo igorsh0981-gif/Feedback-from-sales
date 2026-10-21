@@ -76,8 +76,9 @@ def platform_keyboard() -> InlineKeyboardMarkup:
 
 HELP = (
     "Focus Pulse собирает обратную связь фокус-группы мобильного приложения.\n\n"
-    "Участникам:\n"
-    "/start — указать платформу, модель телефона и версию приложения\n"
+    "Участникам ничего делать не нужно: бот сам собирает сообщения из чатов фокус-группы.\n"
+    "По желанию:\n"
+    "/start — указать платформу, модель телефона и версию приложения (уточняет разбор)\n"
     "/version 4.2.1 — обновить версию приложения\n"
     "/profile — посмотреть свой профиль\n\n"
     "Пожалуйста, не пишите в чат ФИО клиентов: в свободном тексте их не всегда удаётся скрыть.\n\n"
@@ -135,12 +136,23 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         if event.chat.type not in GROUPS:
             return
         chat_id = str(event.chat.id)
-        if not repo.get("Chats", chat_id):
+        by_admin = is_admin(repo, cfg, event.from_user.id if event.from_user else None)
+        rec = repo.get("Chats", chat_id)
+        if not rec:
             repo.insert("Chats", {"chat_id": chat_id, "title": event.chat.title or "", "default_platform": "",
-                                  "active": "0", "added_at": iso()})
-            await repo.commit()
-        text = (f"Бот добавлен в чат «{event.chat.title}». Чтобы собирать сообщения, отправьте в этом чате /connect "
-                f"(нужно отключить privacy mode у бота в BotFather или сделать бота админом чата).")
+                                  "active": "1" if by_admin else "0", "added_at": iso()})
+        elif by_admin:
+            repo.update("Chats", chat_id, {"active": "1", "title": event.chat.title or rec.get("title", "")})
+        if by_admin:
+            audit(repo, f"{event.from_user.full_name} ({event.from_user.id})", chat_id, "Активен", "", "1")
+        await repo.commit()
+        hint = ("Если бот не видит обычные сообщения, отключите privacy mode в BotFather (/setprivacy → Disable) "
+                "и добавьте бота заново либо сделайте его админом чата.")
+        if by_admin:
+            text = f"Чат «{event.chat.title}» подключён: сообщения с этого момента попадают в анализ. {hint}"
+        else:
+            text = (f"Бот добавлен в чат «{event.chat.title}» не администратором. Чтобы собирать сообщения, "
+                    f"отправьте в чате /connect. {hint}")
         for uid in admin_ids(repo, cfg):
             try:
                 await bot.send_message(uid, text)
@@ -154,8 +166,9 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         _ensure_participant(repo, message)
         await repo.commit()
         await message.answer(
-            "Здравствуйте! Это бот фокус-группы мобильного приложения.\n"
-            "Укажите платформу, на которой тестируете приложение:",
+            "Здравствуйте! Это бот фокус-группы мобильного приложения. Он сам собирает сообщения из чатов — "
+            "регистрироваться не обязательно.\n"
+            "Если хотите, укажите платформу, на которой тестируете приложение, — это поможет точнее разбирать ваши сообщения:",
             reply_markup=platform_keyboard(),
         )
 

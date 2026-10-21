@@ -202,3 +202,18 @@ async def test_jira_text_for_bug():
     assert "1 участник · 1 сообщение" in text
     assert "1. Оформить перевод." in text and "«Операция обрабатывается»" in text
     assert "u1" not in text  # без Telegram ID авторов
+
+
+async def test_profile_learned_from_messages_without_registration():
+    repo = await make_repo()
+    repo.insert("Participants", {"telegram_id": "u5", "name": "Азиз"})
+    add_msg(repo, "На Samsung A54, версия 4.2.0, перевод завис", author="u5", minutes_ago=40)
+    await Analyzer(repo, ScriptedClassifier({**BUG, "platform": "Android", "device": "Samsung A54", "app_version": "4.2.0"}), pause_min=10).run()
+    p = repo.get("Participants", "u5")
+    assert (p["platform"], p["device"], p["app_version"]) == ("Android", "Samsung A54", "4.2.0")
+    assert repo.get("Issues", "FP-001")["app_version"] == "4.2.0"
+    # следующее сообщение без указания версии получает версию из профиля
+    add_msg(repo, "Вклад не открывается", author="u5", minutes_ago=15)
+    await Analyzer(repo, ScriptedClassifier({**BUG, "title": "Вклад", "app_version": "4.1.0"}), pause_min=10).run()
+    assert repo.get("Participants", "u5")["app_version"] == "4.2.0"  # старая версия не затирает новую
+    assert repo.get("Issues", "FP-002")["platform"] == "Android"

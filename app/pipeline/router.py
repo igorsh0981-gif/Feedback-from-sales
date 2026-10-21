@@ -23,7 +23,7 @@ from ..services import (
     resolve_issue,
 )
 from ..storage.repo import Repo
-from ..util import compare_versions, iso
+from ..util import compare_versions, iso, parse_version
 from .classifier import Analysis
 from .episodes import Episode
 
@@ -171,3 +171,36 @@ def _touch(repo: Repo, issue: dict, platform: str) -> None:
     if merged != issue.get("platform"):
         changes["platform"] = merged
     repo.update("Issues", issue["issue_id"], changes)
+
+
+def learn_profile(repo: Repo, ep: Episode, a: Analysis) -> dict:
+    """Профиль участника без регистрации: платформа, устройство и версия из того, что он сам написал или показал.
+
+    Обновляется только эпизод одного автора. Версия меняется, только если новая не старше записанной.
+    Возвращает изменённые поля профиля.
+    """
+    if len(ep.author_ids) != 1:
+        return {}
+    pid = ep.author_ids[0]
+    person = repo.get("Participants", pid)
+    if not person:
+        return {}
+    changes: dict[str, str] = {}
+    if a.platform in ("iOS", "Android") and not person.get("platform"):
+        changes["platform"] = a.platform
+    if a.device and not person.get("device"):
+        changes["device"] = a.device
+    if a.app_version and parse_version(a.app_version):
+        cmp = compare_versions(a.app_version, person.get("app_version"))
+        if not person.get("app_version") or (cmp is not None and cmp > 0):
+            changes["app_version"] = a.app_version
+    if not changes:
+        return {}
+    changes["updated_at"] = iso()
+    repo.update("Participants", pid, changes)
+    for m in ep.messages:
+        fill = {k: v for k, v in changes.items() if k in ("platform", "device", "app_version") and not m.get(k)}
+        if fill:
+            repo.update("Messages", m["msg_id"], fill)
+            m.update(fill)
+    return changes

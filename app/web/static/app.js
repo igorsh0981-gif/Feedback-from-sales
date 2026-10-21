@@ -575,8 +575,8 @@ async function msgAction(msgId, action) {
 // ---------------------------------------------------------------- источники
 function sourcesPage() {
   const admin = isAdmin();
-  if (!S.data.chats.length) return `<div class="banner"><span>Чатов пока нет. Добавьте бота в чат фокус-группы и отправьте в чате <code>/connect</code> от имени администратора.</span></div>`;
-  return `<div class="banner"><span>Чтобы подключить новый чат: добавьте бота, отключите у него privacy mode в BotFather (или сделайте админом чата) и отправьте в чате <code>/connect</code>. Участникам — <code>/start</code> в личке бота, чтобы указать платформу, телефон и версию.</span></div>
+  if (!S.data.chats.length) return `<div class="banner"><span>Чатов пока нет. Администратор добавляет бота в действующий чат фокус-группы — чат подключается автоматически.</span></div>`;
+  return `<div class="banner"><span>Чтобы подключить чат, администратор добавляет в него бота — чат подключается сам. Если бота добавил кто-то другой, отправьте в чате <code>/connect</code>. У бота должен быть отключён privacy mode в BotFather (или бот — админ чата). Участникам ничего делать не нужно: платформу, телефон и версию бот берёт из их сообщений и скриншотов.</span></div>
   <div class="grid3">${S.data.chats.map(c => {
     const n = S.data.issues.filter(i => i.chats.includes(c.chat_id) && !i.merged_into).length;
     return `<section class="panel chatcard"><span class="chaticon">↗</span><h2>${esc(c.title)}</h2><span class="badge ${c.active === '1' ? 'approved' : ''}">${c.active === '1' ? 'Собираем сообщения' : 'Отключён'}</span><p>Telegram · ${c.participants} ${plural(c.participants, 'автор', 'автора', 'авторов')} · ${c.messages} сообщ.<br>Последнее сообщение: ${c.last_message_at ? showDT(c.last_message_at) : '—'}<br>Платформа по умолчанию: ${esc(c.default_platform || 'не задана')}</p>
@@ -622,14 +622,14 @@ function settingsPage() {
   }).join('')}</tbody></table></div>
   ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Раздел<select id="newopSection">${opts(o.sections)}</select></label><label>Операция<input id="newopName" placeholder="Например: Оплата штрафов"></label><button onclick="opAdd()">Добавить операцию</button></div>` : ''}</section>
 
-  <section class="panel settings" style="margin-top:20px"><h2>Релизы</h2><p class="small">Нужны для срока «до ближайшего релиза» и для логики регрессий. При заведении релиза бот может попросить участников обновить версию в профиле.</p>
+  <section class="panel settings" style="margin-top:20px"><h2>Релизы</h2><p class="small">Нужны для срока «до ближайшего релиза» и для логики регрессий. Версию участника бот берёт из его сообщений; можно также написать в личку тем, кто запускал бота.</p>
   ${S.data.releases.map(r => `<div class="settingrow"><div><b>${esc(r.version)}</b> · ${esc(r.platform)}<p>Выход: ${showDate(r.released_at)} · завёл ${esc(r.created_by)}</p></div></div>`).join('') || '<p class="small">Релизов пока нет.</p>'}
-  ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Версия<input id="relVersion" placeholder="4.2.1"></label><label>Платформа<select id="relPlatform">${opts(['iOS и Android', 'iOS', 'Android'])}</select></label><label>Дата выхода<input id="relDate" type="date" value="${today()}"></label><label class="checklabel"><input type="checkbox" id="relNotify" checked> Попросить участников обновить версию</label><button onclick="addRelease()">Завести релиз</button></div>` : ''}</section>
+  ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Версия<input id="relVersion" placeholder="4.2.1"></label><label>Платформа<select id="relPlatform">${opts(['iOS и Android', 'iOS', 'Android'])}</select></label><label>Дата выхода<input id="relDate" type="date" value="${today()}"></label><label class="checklabel"><input type="checkbox" id="relNotify"> Написать в личку участникам, которые запускали бота</label><button onclick="addRelease()">Завести релиз</button></div>` : ''}</section>
 
   <section class="panel settings" style="margin-top:20px"><h2>Интеграции и доступ</h2>
   <div class="settingrow"><div><b>Google Sheets</b><p>Хранилище всех данных. Проверка раз в час${m.health_checked_at ? ', последняя ' + showDT(m.health_checked_at) : ''}.</p></div><span class="badge ${h.sheets === 'ok' ? 'approved' : 'review'}">${esc(h.sheets || '—')}</span></div>
   <div class="settingrow"><div><b>Claude</b><p>Классификация обезличенных эпизодов. Сегодня ${m.calls_today} из ${m.daily_limit} вызовов.</p></div><span class="badge ${h.claude === 'ok' ? 'approved' : 'review'}">${esc(h.claude || '—')}</span></div>
-  <div class="settingrow"><div><b>Telegram</b><p>${m.bot_username ? 'Бот @' + esc(m.bot_username) : 'Бот не подключён'} · участников с профилем: ${S.data.participants}</p></div><span class="badge ${h.telegram === 'ok' ? 'approved' : 'review'}">${esc(h.telegram || '—')}</span></div>
+  <div class="settingrow"><div><b>Telegram</b><p>${m.bot_username ? 'Бот @' + esc(m.bot_username) : 'Бот не подключён'} · участников в чатах: ${S.data.participants}</p></div><span class="badge ${h.telegram === 'ok' ? 'approved' : 'review'}">${esc(h.telegram || '—')}</span></div>
   <div class="settingrow"><div><b>Администраторы</b><p>${S.data.admins.map(a => esc(a.name || a.telegram_id) + ' · ' + esc(a.telegram_id)).join('<br>') || 'Не заданы'}</p></div></div>
   ${admin ? '<div class="settingrow"><div><b>Перечитать таблицу</b><p>Если правили данные прямо в Google Sheets.</p></div><button onclick="reloadSheets()">Перечитать</button></div>' : ''}</section>`;
 }

@@ -95,3 +95,26 @@ async def test_connect_collect_register_login():
     assert tokens.consume(token) == (ADMIN, "Игорь")
     assert tokens.consume(token) is None
     assert any("Не похоже на номер версии" in t for t in texts)
+
+
+async def test_chat_auto_connected_when_admin_adds_bot():
+    repo = Repo(MemoryBackend())
+    await repo.init()
+    cfg = Config(admin_ids={ADMIN})
+    bot = Bot("42:TEST", session=FakeSession())
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.include_router(build_router(repo, cfg, Collector(repo, "eng", None, None), Analyzer(repo, HeuristicClassifier()), LoginTokens()))
+
+    def added(n, chat_id, by):
+        return Update.model_validate({"update_id": n, "my_chat_member": {
+            "chat": {"id": chat_id, "type": "supergroup", "title": "Пилот"},
+            "from": {"id": by, "is_bot": False, "first_name": "X"}, "date": datetime.now(timezone.utc),
+            "old_chat_member": {"status": "left", "user": {"id": 42, "is_bot": True, "first_name": "bot"}},
+            "new_chat_member": {"status": "member", "user": {"id": 42, "is_bot": True, "first_name": "bot"}}}})
+
+    await dp.feed_update(bot, added(1, -100777, ADMIN))
+    await dp.feed_update(bot, added(2, -100888, USER))
+    assert repo.get("Chats", "-100777")["active"] == "1"
+    assert repo.get("Chats", "-100888")["active"] == "0"
+    await dp.feed_update(bot, upd(3, -100777, "supergroup", USER, "Не открывается вклад"))
+    assert repo.get("Messages", "-100777:3")

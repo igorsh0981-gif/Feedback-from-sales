@@ -21,7 +21,7 @@ from ..util import iso, jloads, now, parse_dt
 from .classifier import EpisodeInput, EpisodeMessage
 from .episodes import Episode, build_episodes
 from .prefilter import detect_noise
-from .router import apply_analysis
+from .router import apply_analysis, learn_profile
 
 log = logging.getLogger(__name__)
 _PREV_ISSUE_RE = re.compile(r"было в (FP-\d+)")
@@ -286,6 +286,8 @@ class Analyzer:
             for m in ep.messages:
                 edited_from.update(_PREV_ISSUE_RE.findall(m.get("state_reason", "")))
             chat = self.repo.get("Chats", ep.chat_id) or {}
+            if analysis.kind in ("issue", "context"):
+                learn_profile(self.repo, ep, analysis)
             outcome, issue_id = apply_analysis(self.repo, ep, analysis, chat.get("default_platform", ""))
             res.episodes += 1
             if issue_id:
