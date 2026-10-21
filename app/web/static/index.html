@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus Pulse · Обратная связь</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23286546'/%3E%3Ctext x='16' y='23' font-family='Arial' font-size='20' font-weight='700' fill='%23d6f3b3' text-anchor='middle'%3Ef%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<aside>
+  <div class="brand"><span class="mark">f</span>focus pulse<span style="color:#a7ba8a">.</span></div>
+  <div class="navlabel">РАБОЧЕЕ ПРОСТРАНСТВО</div>
+  <nav id="nav" aria-label="Разделы"></nav>
+  <div class="sidebottom" id="sidebottom"></div>
+</aside>
+<main>
+  <header class="top">
+    <span>Mobile Banking <span style="color:#a0a89e"> / </span> Фокус-группа</span>
+    <div class="topright" id="topright"></div>
+  </header>
+  <div id="app"><div class="empty">Загрузка…</div></div>
+</main>
+<div id="modal" class="drawerback"><section class="drawer" role="dialog" aria-modal="true" aria-label="Карточка обращения" id="detail"></section></div>
+<div class="submodal" id="taskmodal" hidden role="dialog" aria-modal="true" aria-label="Задача для Jira"><div class="subcontent" id="taskcontent"></div></div>
+<div class="submodal" id="imagemodal" hidden role="dialog" aria-modal="true" aria-label="Просмотр скриншота"><div class="subcontent imgviewer" id="imagecontent"></div></div>
+<div class="submodal" id="loginmodal" hidden role="dialog" aria-modal="true" aria-label="Вход администратора"><div class="subcontent" id="logincontent"></div></div>
+<div id="toast" role="status"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

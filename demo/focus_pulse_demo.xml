@@ -1,0 +1,1060 @@
+<?xml version='1.0' encoding='utf-8'?>
+<focusPulseExport schemaVersion="1.0" dataMode="demo" generatedAt="2026-10-21T16:28:54+05:00" timezone="Asia/Tashkent" scope="full-demo-dataset">
+  <description>Демонстрационные обращения прототипа Focus Pulse. Это выгрузка данных, не XML интерфейса и не пакет импорта Jira. Локальные изменения пользователя в браузере не включены. Имена, username и ID вымышленные.</description>
+  <prototypeUrl>https://focus-pulse-review.coolbowl16.chatgpt.site</prototypeUrl>
+  <configuration>
+    <analysisIntervalMinutes>20</analysisIntervalMinutes>
+    <dateFilterField>created</dateFilterField>
+    <dateRangeInclusive>true</dateRangeInclusive>
+  </configuration>
+  <dictionaries>
+    <chats>
+      <chat id="DEMO-CHAT-0">Android · Ташкент</chat>
+      <chat id="DEMO-CHAT-1">iOS · Пилот</chat>
+      <chat id="DEMO-CHAT-2">Команда · Premium</chat>
+    </chats>
+    <platforms>
+      <platform>iOS</platform>
+      <platform>Android</platform>
+      <platform>Не указана</platform>
+    </platforms>
+    <operations>
+      <operation>Переводы</operation>
+      <operation>Платежи</operation>
+      <operation>Вклады</operation>
+      <operation>Карты</operation>
+      <operation>Вход</operation>
+      <operation>Главная</operation>
+      <operation>Уведомления</operation>
+      <operation>Настройки</operation>
+      <operation>Конвертация</operation>
+      <operation>Регистрация</operation>
+      <operation>Не определён</operation>
+    </operations>
+  </dictionaries>
+  <issues count="19">
+    <issue id="FP-142">
+      <title>Перевод зависает после подтверждения</title>
+      <type>Баг</type>
+      <area>Переводы</area>
+      <platform>Android</platform>
+      <created>2026-10-21</created>
+      <priority>Критичный</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>Подтвердил перевод, деньги списались, а экран всё ещё загружается. У получателя пока нет поступления.</text>
+      <reason>Есть признаки сбоя операции. Скриншот подтверждает зависшее состояние, но статус транзакции нужно проверить в системе.</reason>
+      <due>2026-10-20</due>
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>7</messageCount>
+      <participantCount>4</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M142-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U05" identitySource="demo">
+            <displayName>Азиз · демо</displayName>
+            <username available="true">demo_aziz</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:32</time>
+          <text>Подтвердил перевод, деньги списались, а экран всё ещё загружается. У получателя пока нет поступления.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M142-2" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M142-3" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:34</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M142-4" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:35</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues>
+        <issueRef id="FP-128" relation="similar-symptoms-needs-review" />
+      </relatedIssues>
+      <attachments>
+        <attachment name="screen-142.svg" path="assets/transfer.svg" embedded="false" demo="true" />
+      </attachments>
+      <jiraKey />
+    </issue>
+    <issue id="FP-143">
+      <title>Не удаётся найти чек после оплаты</title>
+      <type>UX</type>
+      <area>Платежи</area>
+      <platform>iOS</platform>
+      <created>2026-10-20</created>
+      <priority>Средний</priority>
+      <status>Новое</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>Оплатил интернет. Где теперь чек? Раньше он сразу появлялся, сейчас вообще не вижу.</text>
+      <reason>Неясно, отсутствует ли чек или пользователь не находит его. Возможны UX-проблема и баг. Нужна проверка сценария.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>true</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>3</messageCount>
+      <participantCount>2</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M143-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:32</time>
+          <text>Оплатил интернет. Где теперь чек? Раньше он сразу появлялся, сейчас вообще не вижу.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M143-2" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments>
+        <attachment name="screen-143.svg" path="assets/receipt.svg" embedded="false" demo="true" />
+      </attachments>
+      <jiraKey />
+    </issue>
+    <issue id="FP-144">
+      <title>Добавить повтор перевода из истории</title>
+      <type>Пожелание</type>
+      <area>Переводы</area>
+      <platform>Android</platform>
+      <created>2026-10-19</created>
+      <priority>Средний</priority>
+      <status>Оценка</status>
+      <owner>Продукт</owner>
+      <version>4.2.0</version>
+      <text>Каждый месяц перевожу одним и тем же людям. Можно кнопку «Повторить» прямо в истории?</text>
+      <reason>Пользователь явно просит новую возможность. Похожие предложения объединены, все источники сохранены.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>9</messageCount>
+      <participantCount>6</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+        <chatRef id="DEMO-CHAT-2" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M144-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:32</time>
+          <text>Каждый месяц перевожу одним и тем же людям. Можно кнопку «Повторить» прямо в истории?</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M144-2" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M144-3" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:34</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M144-4" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U04" identitySource="demo">
+            <displayName>Мария · демо</displayName>
+            <username available="false" />
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:35</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M144-5" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U05" identitySource="demo">
+            <displayName>Азиз · демо</displayName>
+            <username available="true">demo_aziz</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:36</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M144-6" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:37</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-145">
+      <title>Приложение закрывается при открытии карты</title>
+      <type>Баг</type>
+      <area>Карты</area>
+      <platform>Android</platform>
+      <created>2026-10-18</created>
+      <priority>Высокий</priority>
+      <status>Подтверждено</status>
+      <owner>Android</owner>
+      <version>4.2.0</version>
+      <text>На Samsung открываю карту HUMO и приложение сразу закрывается. Повторил три раза.</text>
+      <reason>Описан повторяемый сбой. В демонстрационном наборе воспроизведение подтверждено QA.</reason>
+      <due>2026-10-23</due>
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>5</messageCount>
+      <participantCount>3</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M145-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-18</date>
+          <time>10:32</time>
+          <text>На Samsung открываю карту HUMO и приложение сразу закрывается. Повторил три раза.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M145-2" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-18</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M145-3" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U04" identitySource="demo">
+            <displayName>Мария · демо</displayName>
+            <username available="false" />
+          </sender>
+          <date>2026-10-18</date>
+          <time>10:34</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-146">
+      <title>Лимит перевода: ошибка или ограничение?</title>
+      <type>Баг</type>
+      <area>Переводы</area>
+      <platform>iOS</platform>
+      <created>2026-10-17</created>
+      <priority>Средний</priority>
+      <status>Уточнение</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>Больше 10 млн не переводит. Это ошибка? Мне нужно отправить 12 млн.</text>
+      <reason>Без правил по лимитам нельзя отличить дефект от штатного ограничения. Требуется решение администратора.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>true</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>2</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-2" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M146-1" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-17</date>
+          <time>10:32</time>
+          <text>Больше 10 млн не переводит. Это ошибка? Мне нужно отправить 12 млн.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-147">
+      <title>Скрывать баланс на главном экране</title>
+      <type>Пожелание</type>
+      <area>Главная</area>
+      <platform>iOS</platform>
+      <created>2026-10-16</created>
+      <priority>Низкий</priority>
+      <status>Новое</status>
+      <owner>Продукт</owner>
+      <version>4.2.0</version>
+      <text>Хотелось бы скрыть все суммы одним нажатием, когда открываю приложение в общественном месте.</text>
+      <reason>Явно сформулирован запрос на новую возможность.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>6</messageCount>
+      <participantCount>5</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+        <chatRef id="DEMO-CHAT-2" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M147-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U04" identitySource="demo">
+            <displayName>Мария · демо</displayName>
+            <username available="false" />
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:32</time>
+          <text>Хотелось бы скрыть все суммы одним нажатием, когда открываю приложение в общественном месте.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M147-2" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U05" identitySource="demo">
+            <displayName>Азиз · демо</displayName>
+            <username available="true">demo_aziz</username>
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M147-3" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:34</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M147-4" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:35</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M147-5" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:36</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-148">
+      <title>Непонятная ошибка при входе</title>
+      <type>UX</type>
+      <area>Вход</area>
+      <platform>Android</platform>
+      <created>2026-10-15</created>
+      <priority>Высокий</priority>
+      <status>Уточнение</status>
+      <owner>Не назначен</owner>
+      <version>4.1.9</version>
+      <text>Пишет «Что-то пошло не так». Что именно не так и что мне сделать?</text>
+      <reason>Текст не объясняет причину. Неизвестно, вызвано ли это сетью, вводом данных или сбоем приложения.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>true</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>4</messageCount>
+      <participantCount>2</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M148-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U05" identitySource="demo">
+            <displayName>Азиз · демо</displayName>
+            <username available="true">demo_aziz</username>
+          </sender>
+          <date>2026-10-15</date>
+          <time>10:32</time>
+          <text>Пишет «Что-то пошло не так». Что именно не так и что мне сделать?</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M148-2" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-15</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments>
+        <attachment name="screen-148.svg" path="assets/login.svg" embedded="false" demo="true" />
+      </attachments>
+      <jiraKey />
+    </issue>
+    <issue id="FP-149">
+      <title>Push приходит дважды после оплаты</title>
+      <type>Баг</type>
+      <area>Уведомления</area>
+      <platform>iOS</platform>
+      <created>2026-10-19</created>
+      <priority>Средний</priority>
+      <status>В работе</status>
+      <owner>Backend</owner>
+      <version>4.2.0</version>
+      <text>Один платёж, а уведомлений два с одинаковой суммой. В истории операция одна.</text>
+      <reason>Описан дубль уведомлений при одной операции. Проверяется обработка событий.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>3</messageCount>
+      <participantCount>2</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M149-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:32</time>
+          <text>Один платёж, а уведомлений два с одинаковой суммой. В истории операция одна.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M149-2" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-150">
+      <title>Показывать комиссию до подтверждения</title>
+      <type>Пожелание</type>
+      <area>Переводы</area>
+      <platform>iOS</platform>
+      <created>2026-10-20</created>
+      <priority>Средний</priority>
+      <status>Оценка</status>
+      <owner>Продукт</owner>
+      <version>4.2.0</version>
+      <text>Хочу видеть комиссию сразу после ввода суммы, а не на последнем шаге.</text>
+      <reason>Предложение изменить момент отображения информации.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>4</messageCount>
+      <participantCount>3</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-2" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M150-1" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:32</time>
+          <text>Хочу видеть комиссию сразу после ввода суммы, а не на последнем шаге.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M150-2" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M150-3" chatRef="DEMO-CHAT-2">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:34</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-151">
+      <title>Мелкий текст на экране подтверждения</title>
+      <type>UX</type>
+      <area>Платежи</area>
+      <platform>Android</platform>
+      <created>2026-10-21</created>
+      <priority>Низкий</priority>
+      <status>Новое</status>
+      <owner>Дизайн</owner>
+      <version>4.2.0</version>
+      <text>Сумму вижу хорошо, а реквизиты получателя очень мелкие. Хотелось бы увеличить.</text>
+      <reason>Проблема читаемости существующего интерфейса.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>3</messageCount>
+      <participantCount>2</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M151-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:32</time>
+          <text>Сумму вижу хорошо, а реквизиты получателя очень мелкие. Хотелось бы увеличить.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M151-2" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-128">
+      <title>Зависание перевода после подтверждения</title>
+      <type>Баг</type>
+      <area>Переводы</area>
+      <platform>Android</platform>
+      <created>2026-10-16</created>
+      <priority>Высокий</priority>
+      <status>Закрыто</status>
+      <owner>Backend</owner>
+      <version>4.1.8</version>
+      <text>После подтверждения перевод остаётся в обработке, экран не обновляется.</text>
+      <reason>Демонстрационный ранее закрытый случай. Причина нового обращения ещё не установлена.</reason>
+      <due>2026-10-18</due>
+      <resolvedAt>2026-10-18</resolvedAt>
+      <fixVersion>4.1.9</fixVersion>
+      <resolution>Исправлено обновление статуса перевода. QA проверил сценарий на версии 4.1.9.</resolution>
+      <requiresReview>false</requiresReview>
+      <resolved>true</resolved>
+      <messageCount>3</messageCount>
+      <participantCount>2</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M128-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:32</time>
+          <text>После подтверждения перевод остаётся в обработке, экран не обновляется.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+        <reporter role="additional" messageId="DEMO-M128-2" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U04" identitySource="demo">
+            <displayName>Мария · демо</displayName>
+            <username available="false" />
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:33</time>
+          <text>Демонстрационный повторный сигнал по этому обращению.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-201">
+      <title>Не открывается экран оформления вклада</title>
+      <type>Баг</type>
+      <area>Вклады</area>
+      <platform>iOS</platform>
+      <created>2026-10-15</created>
+      <priority>Высокий</priority>
+      <status>Закрыто</status>
+      <owner>Не назначен</owner>
+      <version>4.1.8</version>
+      <text>На iPhone выбираю вклад, но экран оформления остаётся пустым.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due>2026-10-17</due>
+      <resolvedAt>2026-10-17</resolvedAt>
+      <fixVersion>4.1.9</fixVersion>
+      <resolution>Исправлена загрузка условий вклада. Проверено QA.</resolution>
+      <requiresReview>false</requiresReview>
+      <resolved>true</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M201-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U04" identitySource="demo">
+            <displayName>Мария · демо</displayName>
+            <username available="false" />
+          </sender>
+          <date>2026-10-15</date>
+          <time>10:32</time>
+          <text>На iPhone выбираю вклад, но экран оформления остаётся пустым.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-202">
+      <title>Кнопка пополнения вклада не реагирует</title>
+      <type>Баг</type>
+      <area>Вклады</area>
+      <platform>Android</platform>
+      <created>2026-10-17</created>
+      <priority>Высокий</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>Открываю вклад и нажимаю «Пополнить», ничего не происходит.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M202-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U05" identitySource="demo">
+            <displayName>Азиз · демо</displayName>
+            <username available="true">demo_aziz</username>
+          </sender>
+          <date>2026-10-17</date>
+          <time>10:32</time>
+          <text>Открываю вклад и нажимаю «Пополнить», ничего не происходит.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-203">
+      <title>Доходность вклада не обновляется после пополнения</title>
+      <type>Баг</type>
+      <area>Вклады</area>
+      <platform>iOS</platform>
+      <created>2026-10-19</created>
+      <priority>Средний</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>Внёс деньги на вклад, а прогноз дохода остался прежним.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M203-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U06" identitySource="demo">
+            <displayName>Елена · демо</displayName>
+            <username available="true">demo_elena</username>
+          </sender>
+          <date>2026-10-19</date>
+          <time>10:32</time>
+          <text>Внёс деньги на вклад, а прогноз дохода остался прежним.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-204">
+      <title>Повторно пустой экран оформления вклада</title>
+      <type>Баг</type>
+      <area>Вклады</area>
+      <platform>iOS</platform>
+      <created>2026-10-21</created>
+      <priority>Высокий</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>На 4.2.0 снова пустой экран при выборе вклада. Ранее это исправляли.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>true</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M204-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U01" identitySource="demo">
+            <displayName>Алексей · демо</displayName>
+            <username available="true">demo_alexey</username>
+          </sender>
+          <date>2026-10-21</date>
+          <time>10:32</time>
+          <text>На 4.2.0 снова пустой экран при выборе вклада. Ранее это исправляли.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues>
+        <issueRef id="FP-201" relation="similar-symptoms-needs-review" />
+      </relatedIssues>
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-205">
+      <title>Показывать календарь начисления процентов</title>
+      <type>Пожелание</type>
+      <area>Вклады</area>
+      <platform>Android</platform>
+      <created>2026-10-20</created>
+      <priority>Низкий</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>Хочу видеть даты ближайших начислений по вкладу.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M205-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U02" identitySource="demo">
+            <displayName>Дилноза · демо</displayName>
+            <username available="true">demo_dilnoza</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:32</time>
+          <text>Хочу видеть даты ближайших начислений по вкладу.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-206">
+      <title>Ошибка оплаты мобильной связи</title>
+      <type>Баг</type>
+      <area>Платежи</area>
+      <platform>Android</platform>
+      <created>2026-10-16</created>
+      <priority>Средний</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>При оплате телефона появляется ошибка, списания нет.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M206-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U03" identitySource="demo">
+            <displayName>Тимур · демо</displayName>
+            <username available="true">demo_timur</username>
+          </sender>
+          <date>2026-10-16</date>
+          <time>10:32</time>
+          <text>При оплате телефона появляется ошибка, списания нет.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-207">
+      <title>Не обновляется курс при конвертации</title>
+      <type>Баг</type>
+      <area>Конвертация</area>
+      <platform>iOS</platform>
+      <created>2026-10-18</created>
+      <priority>Средний</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>На экране конвертации показан прежний курс после обновления.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-1" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M207-1" chatRef="DEMO-CHAT-1">
+          <sender id="DEMO-U04" identitySource="demo">
+            <displayName>Мария · демо</displayName>
+            <username available="false" />
+          </sender>
+          <date>2026-10-18</date>
+          <time>10:32</time>
+          <text>На экране конвертации показан прежний курс после обновления.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+    <issue id="FP-208">
+      <title>Не приходит код подтверждения регистрации</title>
+      <type>Баг</type>
+      <area>Регистрация</area>
+      <platform>Android</platform>
+      <created>2026-10-20</created>
+      <priority>Высокий</priority>
+      <status>Требует воспроизведения</status>
+      <owner>Не назначен</owner>
+      <version>4.2.0</version>
+      <text>При регистрации не пришёл код подтверждения. Повторная отправка не помогла.</text>
+      <reason>Пример для проверки фильтров по дате, платформе и операции. Подтверждение причины требует анализа.</reason>
+      <due />
+      <resolvedAt />
+      <fixVersion />
+      <resolution />
+      <requiresReview>false</requiresReview>
+      <resolved>false</resolved>
+      <messageCount>1</messageCount>
+      <participantCount>1</participantCount>
+      <chatReferences>
+        <chatRef id="DEMO-CHAT-0" />
+      </chatReferences>
+      <reporters>
+        <reporter role="initiator" messageId="DEMO-M208-1" chatRef="DEMO-CHAT-0">
+          <sender id="DEMO-U05" identitySource="demo">
+            <displayName>Азиз · демо</displayName>
+            <username available="true">demo_aziz</username>
+          </sender>
+          <date>2026-10-20</date>
+          <time>10:32</time>
+          <text>При регистрации не пришёл код подтверждения. Повторная отправка не помогла.</text>
+          <telegramMessageUrl available="false" />
+        </reporter>
+      </reporters>
+      <relatedIssues />
+      <attachments />
+      <jiraKey />
+    </issue>
+  </issues>
+  <chatMessages count="6">
+    <message id="MSG-801" chatRef="DEMO-CHAT-0">
+      <sender id="DEMO-U04" identitySource="demo">
+        <displayName>Мария · демо</displayName>
+        <username available="false" />
+      </sender>
+      <text>Всем доброе утро!</text>
+      <classification>Отфильтровано</classification>
+      <reason>Приветствие без обратной связи по приложению.</reason>
+    </message>
+    <message id="MSG-802" chatRef="DEMO-CHAT-2">
+      <sender id="DEMO-U05" identitySource="demo">
+        <displayName>Азиз · демо</displayName>
+        <username available="true">demo_aziz</username>
+      </sender>
+      <text>Коллеги, созвон сегодня в 15:00?</text>
+      <classification>Отфильтровано</classification>
+      <reason>Организационная переписка, не описывает работу приложения.</reason>
+    </message>
+    <message id="MSG-803" chatRef="DEMO-CHAT-1">
+      <sender id="DEMO-U06" identitySource="demo">
+        <displayName>Елена · демо</displayName>
+        <username available="true">demo_elena</username>
+      </sender>
+      <text>Спасибо 👍</text>
+      <classification>Отфильтровано</classification>
+      <reason>Короткая реакция; исходная реплика сохранена.</reason>
+    </message>
+    <message id="MSG-804" chatRef="DEMO-CHAT-0">
+      <sender id="DEMO-U01" identitySource="demo">
+        <displayName>Алексей · демо</displayName>
+        <username available="true">demo_alexey</username>
+      </sender>
+      <text>На Wi-Fi тоже повторяется. Перезапуск не помог.</text>
+      <classification>Контекст</classification>
+      <reason>Уточнение к сообщению о переводе. Сохраняется в карточке, не создаёт отдельную задачу.</reason>
+      <issueRef id="FP-142" />
+    </message>
+    <message id="MSG-805" chatRef="DEMO-CHAT-1">
+      <sender id="DEMO-U02" identitySource="demo">
+        <displayName>Дилноза · демо</displayName>
+        <username available="true">demo_dilnoza</username>
+      </sender>
+      <text>У меня снова не работает</text>
+      <classification>На проверке</classification>
+      <reason>Возможно сообщение о проблеме. Не хватает контекста — автоматическое исключение запрещено.</reason>
+    </message>
+    <message id="MSG-806" chatRef="DEMO-CHAT-0">
+      <sender id="DEMO-U03" identitySource="demo">
+        <displayName>Тимур · демо</displayName>
+        <username available="true">demo_timur</username>
+      </sender>
+      <text>Опять завис перевод на 4.2.0. Ведь это уже исправляли?</text>
+      <classification>Учтено</classification>
+      <reason>Повторный сигнал связан с FP-142 и ранее закрытым FP-128.</reason>
+      <issueRef id="FP-142" />
+    </message>
+  </chatMessages>
+</focusPulseExport>
