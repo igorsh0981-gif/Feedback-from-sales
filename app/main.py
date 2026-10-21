@@ -61,8 +61,8 @@ class Runtime:
     async def upload_screen(self, data: bytes, caption: str) -> str:
         from aiogram.types import BufferedInputFile
 
-        msg = await self.bot.send_photo(self.cfg.service_channel_id, BufferedInputFile(data, "screen.jpg"),
-                                        caption=f"Обезличено · {caption}"[:200])
+        msg = await self.bot.send_photo(self.screen_chat, BufferedInputFile(data, "screen.jpg"),
+                                        caption=f"Обезличено · {caption}"[:200], disable_notification=True)
         return msg.photo[-1].file_id
 
     # ------------------------------------------------------------ фоновые циклы
@@ -166,8 +166,10 @@ class Runtime:
             self.bot = Bot(cfg.telegram_token)
             me = await self.bot.get_me()
             bot_username = me.username or ""
+        # Куда складывать обезличенные скрины: служебный канал, иначе личка первого админа (без звука).
+        self.screen_chat = cfg.service_channel_id or (min(cfg.admin_ids) if cfg.admin_ids else None)
         if self.bot and not cfg.service_channel_id:
-            log.warning("SERVICE_CHANNEL_ID не задан — скриншоты не будут сохраняться и уходить в анализ")
+            log.warning("SERVICE_CHANNEL_ID не задан — обезличенные скрины хранятся в личке админа %s", self.screen_chat)
 
         self.analyzer = Analyzer(
             self.repo, self.classifier, pause_min=cfg.episode_pause_min, daily_limit=cfg.claude_daily_limit,
@@ -209,7 +211,7 @@ class Runtime:
             from .bot.handlers import build_router
 
             collector = Collector(self.repo, cfg.tesseract_langs, self.download,
-                                  self.upload_screen if cfg.service_channel_id else None)
+                                  self.upload_screen if self.screen_chat else None)
             resumed = collector.resume_pending()
             if resumed:
                 log.info("Дообработка %s скриншотов после перезапуска", resumed)
@@ -218,7 +220,8 @@ class Runtime:
             await self.bot.delete_webhook(drop_pending_updates=False)
             tasks.append(asyncio.create_task(dp.start_polling(
                 self.bot, handle_signals=False, close_bot_session=False,
-                allowed_updates=["message", "edited_message", "callback_query", "my_chat_member"],
+                allowed_updates=["message", "edited_message", "channel_post", "edited_channel_post",
+                                 "callback_query", "my_chat_member"],
             ), name="polling"))
             log.info("Бот @%s запущен", bot_username)
 

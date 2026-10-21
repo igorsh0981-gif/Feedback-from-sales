@@ -118,3 +118,28 @@ async def test_chat_auto_connected_when_admin_adds_bot():
     assert repo.get("Chats", "-100888")["active"] == "0"
     await dp.feed_update(bot, upd(3, -100777, "supergroup", USER, "Не открывается вклад"))
     assert repo.get("Messages", "-100777:3")
+
+
+async def test_channel_posts_collected():
+    repo = Repo(MemoryBackend())
+    await repo.init()
+    cfg = Config(admin_ids={ADMIN})
+    bot = Bot("42:TEST", session=FakeSession())
+    dp = Dispatcher(storage=MemoryStorage())
+    dp.include_router(build_router(repo, cfg, Collector(repo, "eng", None, None), Analyzer(repo, HeuristicClassifier()), LoginTokens()))
+    chat = {"id": -100999, "type": "channel", "title": "Канал фокус-группы"}
+    await dp.feed_update(bot, Update.model_validate({"update_id": 1, "my_chat_member": {
+        "chat": chat, "from": {"id": ADMIN, "is_bot": False, "first_name": "Игорь"}, "date": datetime.now(timezone.utc),
+        "old_chat_member": {"status": "left", "user": {"id": 42, "is_bot": True, "first_name": "bot"}},
+        "new_chat_member": {"status": "administrator", "user": {"id": 42, "is_bot": True, "first_name": "bot"},
+                            "can_be_edited": False, "can_manage_chat": True, "can_change_info": False,
+                            "can_delete_messages": False, "can_invite_users": False, "can_restrict_members": False,
+                            "can_promote_members": False, "can_post_messages": True, "is_anonymous": False,
+                            "can_manage_video_chats": False, "can_post_stories": False, "can_edit_stories": False,
+                            "can_delete_stories": False, "can_send_welcome_messages": False}}}))
+    assert repo.get("Chats", "-100999")["active"] == "1"
+    await dp.feed_update(bot, Update.model_validate({"update_id": 2, "channel_post": {
+        "message_id": 5, "date": datetime.now(timezone.utc), "chat": chat, "sender_chat": chat,
+        "author_signature": "Дилноза", "text": "Не приходит код подтверждения, номер +998 91 222 33 44"}}))
+    rec = repo.get("Messages", "-100999:5")
+    assert rec["author_name"] == "Дилноза" and "222 33" not in rec["text_masked"]

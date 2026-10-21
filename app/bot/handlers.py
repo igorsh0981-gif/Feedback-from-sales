@@ -23,6 +23,7 @@ from .collector import Collector
 
 log = logging.getLogger(__name__)
 GROUPS = {ChatType.GROUP, ChatType.SUPERGROUP}
+SOURCES = GROUPS | {ChatType.CHANNEL}
 VERSION_RE = re.compile(r"^\d+(?:\.\d+){1,3}$")
 
 
@@ -131,9 +132,18 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
     async def group_edit(message: Message) -> None:
         collector.store_edit(message)
 
+    # Каналы: бот должен быть админом канала, подключается автоматически, если его добавил админ.
+    @router.channel_post()
+    async def channel_post(message: Message) -> None:
+        collector.store_message(message)
+
+    @router.edited_channel_post()
+    async def channel_edit(message: Message) -> None:
+        collector.store_edit(message)
+
     @router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
     async def bot_added(event: ChatMemberUpdated, bot: Bot) -> None:
-        if event.chat.type not in GROUPS:
+        if event.chat.type not in SOURCES:
             return
         chat_id = str(event.chat.id)
         by_admin = is_admin(repo, cfg, event.from_user.id if event.from_user else None)

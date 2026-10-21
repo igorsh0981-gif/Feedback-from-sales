@@ -92,8 +92,15 @@ class Collector:
                 return rec
 
         user = message.from_user
-        author_id = str(user.id) if user else (str(message.sender_chat.id) if message.sender_chat else "")
-        author_name = (user.full_name if user else (message.sender_chat.title if message.sender_chat else "")) or ""
+        if user:
+            author_id, author_name = str(user.id), user.full_name or ""
+        elif message.author_signature:  # пост в канале с подписью автора
+            author_id = f"{chat_id}:{message.author_signature}"
+            author_name = message.author_signature
+        elif message.sender_chat:
+            author_id, author_name = str(message.sender_chat.id), message.sender_chat.title or ""
+        else:
+            author_id, author_name = "", ""
         participant = self.repo.get("Participants", author_id) if author_id else None
         chat = self.repo.get("Chats", chat_id) or {}
         if user and not participant:
