@@ -39,7 +39,8 @@ FIELD_NAMES = {
     "title": "Заголовок", "summary": "Суть", "steps": "Шаги", "actual": "Факт", "expected": "Ожидание",
     "error_text": "Текст ошибки", "due": "Срок", "resolved_at": "Дата устранения", "fix_version": "Версия исправления",
     "resolution": "Результат", "reject_reason": "Причина отклонения", "comment": "Комментарий",
-    "jira_key": "Ключ Jira", "jira_text": "Текст задачи", "accepted_by": "Принял", "merged_into": "Объединено с",
+    "jira_key": "Ключ Jira", "jira_text": "Текст задачи", "accepted_by": "Принял", "accepted_at": "Дата принятия",
+    "due_set_by": "Срок поставил", "merged_into": "Объединено с",
     "state": "Состояние", "issue_id": "Обращение", "active": "Активен", "default_platform": "Платформа по умолчанию",
     "value": "Значение",
 }

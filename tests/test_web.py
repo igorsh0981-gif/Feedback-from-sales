@@ -10,12 +10,12 @@ from app.web.server import AppContext, create_app
 H = {"X-Requested-With": "fetch"}
 
 
-async def make_client(aiohttp_client, view_token=""):
+async def make_client(aiohttp_client, view_token="", open_edit=False):
     repo = Repo(MemoryBackend())
     await repo.init()
     seed_demo(repo)
     await repo.commit()
-    cfg = Config(demo_mode=True, session_secret="s", view_token=view_token)
+    cfg = Config(demo_mode=True, session_secret="s", view_token=view_token, open_edit=open_edit)
     ctx = AppContext(repo=repo, cfg=cfg, analyzer=Analyzer(repo, HeuristicClassifier()),
                      is_admin=lambda uid: uid == -1, classifier_name="heuristic")
     return await aiohttp_client(create_app(ctx)), repo
@@ -116,3 +116,15 @@ async def test_view_token(aiohttp_client):
     r = await client.get("/?k=abc", allow_redirects=False)
     assert r.status == 302
     assert (await client.get("/api/state")).status == 200
+
+
+async def test_open_edit_by_link_records_actor(aiohttp_client):
+    from urllib.parse import quote
+    client, repo = await make_client(aiohttp_client, view_token="abc", open_edit=True)
+    await client.get("/?k=abc", allow_redirects=False)
+    state = await (await client.get("/api/state")).json()
+    assert state["me"]["admin"] and state["me"]["link"]
+    r = await client.post("/api/issues/FP-147/save", json={"fields": {"owner": "DevOps"}},
+                          headers={**H, "X-Actor": quote("Игорь, PM")})
+    assert r.status == 200
+    assert any(a["actor"] == "Игорь, PM (по ссылке)" and a["object_id"] == "FP-147" for a in repo.rows("Audit"))

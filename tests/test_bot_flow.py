@@ -72,24 +72,29 @@ async def test_connect_collect_register_login():
     rec = repo.get("Messages", "-100500:4")
     assert rec and "123 45" not in rec["text_masked"] and rec["state"] == "В очереди"
 
-    # регистрация участника
-    await dp.feed_update(bot, upd(5, USER, "private", USER, "/start"))
-    await dp.feed_update(bot, upd(6, USER, "private", USER, data="reg:Android"))
-    await dp.feed_update(bot, upd(7, USER, "private", USER, "Samsung A54"))
-    await dp.feed_update(bot, upd(8, USER, "private", USER, "четыре"))
-    await dp.feed_update(bot, upd(9, USER, "private", USER, "4.2.0"))
-    p = repo.get("Participants", str(USER))
+    # участникам бот не отвечает: команды только у администратора
+    before = len(session.sent)
+    for n, text in enumerate(["/start", "/help", "/version 4.2.1", "/profile", "/run", "/login"], 100):
+        await dp.feed_update(bot, upd(n, USER, "private", USER, text))
+    assert len(session.sent) == before
+    assert not repo.get("Participants", str(USER))["app_version"]
+
+    # профиль по желанию — у администратора
+    await dp.feed_update(bot, upd(5, ADMIN, "private", ADMIN, "/start"))
+    await dp.feed_update(bot, upd(6, ADMIN, "private", ADMIN, data="reg:Android"))
+    await dp.feed_update(bot, upd(7, ADMIN, "private", ADMIN, "Samsung A54"))
+    await dp.feed_update(bot, upd(8, ADMIN, "private", ADMIN, "четыре"))
+    await dp.feed_update(bot, upd(9, ADMIN, "private", ADMIN, "4.2.0"))
+    p = repo.get("Participants", str(ADMIN))
     assert (p["platform"], p["device"], p["app_version"]) == ("Android", "Samsung A54", "4.2.0")
-    await dp.feed_update(bot, upd(10, USER, "private", USER, "/version 4.2.1"))
-    assert repo.get("Participants", str(USER))["app_version"] == "4.2.1"
-    await dp.feed_update(bot, upd(11, -100500, "supergroup", USER, "Опять не проходит"))
+    await dp.feed_update(bot, upd(10, ADMIN, "private", ADMIN, "/version 4.2.1"))
+    assert repo.get("Participants", str(ADMIN))["app_version"] == "4.2.1"
+    await dp.feed_update(bot, upd(11, -100500, "supergroup", ADMIN, "Опять не проходит"))
     assert repo.get("Messages", "-100500:11")["app_version"] == "4.2.1"
 
     # вход админа по одноразовой ссылке
-    await dp.feed_update(bot, upd(12, USER, "private", USER, "/login"))
     await dp.feed_update(bot, upd(13, ADMIN, "private", ADMIN, "/login"))
     texts = [m.text for m in session.sent if isinstance(m, SendMessage)]
-    assert any("только администраторам" in t for t in texts)
     link = next(t for t in texts if "/auth/link?t=" in t)
     token = link.split("t=")[1].strip()
     assert tokens.consume(token) == (ADMIN, "Игорь")
@@ -143,3 +148,13 @@ async def test_channel_posts_collected():
         "author_signature": "Дилноза", "text": "Не приходит код подтверждения, номер +998 91 222 33 44"}}))
     rec = repo.get("Messages", "-100999:5")
     assert rec["author_name"] == "Дилноза" and "222 33" not in rec["text_masked"]
+
+
+async def test_admin_by_username():
+    repo = Repo(MemoryBackend())
+    await repo.init()
+    cfg = Config(admin_usernames={"igorsh_uz"})
+    from app.bot.handlers import user_is_admin
+    from aiogram.types import User
+    assert user_is_admin(repo, cfg, User(id=5, is_bot=False, first_name="I", username="IgorSh_Uz"))
+    assert not user_is_admin(repo, cfg, User(id=6, is_bot=False, first_name="X", username="other"))

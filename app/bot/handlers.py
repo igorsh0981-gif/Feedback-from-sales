@@ -54,10 +54,17 @@ class Registration(StatesGroup):
     version = State()
 
 
-def is_admin(repo: Repo, cfg: Config, user_id: int | None) -> bool:
+def is_admin(repo: Repo, cfg: Config, user_id: int | None, username: str | None = None) -> bool:
+    """Команды бота — только для администраторов: ADMIN_IDS, ADMIN_USERNAMES или вкладка Admins."""
     if user_id is None:
         return False
+    if username and username.lower() in cfg.admin_usernames:
+        return True
     return user_id in cfg.admin_ids or bool(repo.get("Admins", str(user_id)))
+
+
+def user_is_admin(repo: Repo, cfg: Config, user) -> bool:
+    return bool(user) and is_admin(repo, cfg, user.id, user.username)
 
 
 def admin_ids(repo: Repo, cfg: Config) -> set[int]:
@@ -94,10 +101,14 @@ HELP = (
 def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyzer, tokens: LoginTokens) -> Router:
     router = Router()
 
+    def admin_only(event) -> bool:
+        """Личные команды бота отвечают только администратору; остальным бот молчит."""
+        return user_is_admin(repo, cfg, getattr(event, "from_user", None))
+
     # ------------------------------------------------------------ группы
     @router.message(Command("connect"), F.chat.type.in_(GROUPS))
     async def connect(message: Message) -> None:
-        if not is_admin(repo, cfg, message.from_user.id if message.from_user else None):
+        if not user_is_admin(repo, cfg, message.from_user):
             return
         chat_id = str(message.chat.id)
         rec = repo.get("Chats", chat_id)
@@ -113,7 +124,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
 
     @router.message(Command("disconnect"), F.chat.type.in_(GROUPS))
     async def disconnect(message: Message) -> None:
-        if not is_admin(repo, cfg, message.from_user.id if message.from_user else None):
+        if not user_is_admin(repo, cfg, message.from_user):
             return
         chat_id = str(message.chat.id)
         if repo.get("Chats", chat_id):
@@ -146,7 +157,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         if event.chat.type not in SOURCES:
             return
         chat_id = str(event.chat.id)
-        by_admin = is_admin(repo, cfg, event.from_user.id if event.from_user else None)
+        by_admin = user_is_admin(repo, cfg, event.from_user)
         rec = repo.get("Chats", chat_id)
         if not rec:
             repo.insert("Chats", {"chat_id": chat_id, "title": event.chat.title or "", "default_platform": "",
@@ -170,7 +181,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
                 log.info("Не удалось уведомить админа %s", uid)
 
     # ------------------------------------------------------------ личка: регистрация
-    @router.message(CommandStart(), F.chat.type == ChatType.PRIVATE)
+    @router.message(CommandStart(), F.chat.type == ChatType.PRIVATE, admin_only)
     async def start(message: Message, state: FSMContext) -> None:
         await state.clear()
         _ensure_participant(repo, message)
@@ -182,7 +193,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
             reply_markup=platform_keyboard(),
         )
 
-    @router.callback_query(F.data.startswith("reg:"))
+    @router.callback_query(F.data.startswith("reg:"), admin_only)
     async def reg_platform(cb: CallbackQuery, state: FSMContext) -> None:
         platform = cb.data.split(":", 1)[1]
         if platform not in ("iOS", "Android"):
@@ -198,7 +209,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         await cb.message.answer(f"Платформа: {platform}. Модель телефона? Например: Samsung A54 или iPhone 13")
         await cb.answer()
 
-    @router.message(Registration.device, F.chat.type == ChatType.PRIVATE, F.text)
+    @router.message(Registration.device, F.chat.type == ChatType.PRIVATE, F.text, admin_only)
     async def reg_device(message: Message, state: FSMContext) -> None:
         device = message.text.strip()[:60]
         repo.update("Participants", str(message.from_user.id), {"device": device, "updated_at": iso()})
@@ -206,7 +217,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         await state.set_state(Registration.version)
         await message.answer("Версия приложения? Её видно в «Профиль → О приложении». Например: 4.2.0")
 
-    @router.message(Registration.version, F.chat.type == ChatType.PRIVATE, F.text)
+    @router.message(Registration.version, F.chat.type == ChatType.PRIVATE, F.text, admin_only)
     async def reg_version(message: Message, state: FSMContext) -> None:
         version = message.text.strip()
         if not VERSION_RE.match(version):
@@ -217,7 +228,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         await state.clear()
         await message.answer("Готово, профиль сохранён. Когда обновите приложение, отправьте /version 4.2.1\n\n" + _profile(repo, message.from_user.id))
 
-    @router.message(Command("version"), F.chat.type == ChatType.PRIVATE)
+    @router.message(Command("version"), F.chat.type == ChatType.PRIVATE, admin_only)
     async def set_version(message: Message, command: CommandObject) -> None:
         version = (command.args or "").strip()
         if not VERSION_RE.match(version):
@@ -228,19 +239,19 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
         await repo.commit()
         await message.answer(f"Версия обновлена: {version}")
 
-    @router.message(Command("profile"), F.chat.type == ChatType.PRIVATE)
+    @router.message(Command("profile"), F.chat.type == ChatType.PRIVATE, admin_only)
     async def profile(message: Message) -> None:
         await message.answer(_profile(repo, message.from_user.id))
 
-    @router.message(Command("help"))
+    @router.message(Command("help"), admin_only)
     async def help_cmd(message: Message) -> None:
         if message.chat.type == ChatType.PRIVATE:
             await message.answer(HELP)
 
     # ------------------------------------------------------------ личка: админ
-    @router.message(Command("login"), F.chat.type == ChatType.PRIVATE)
+    @router.message(Command("login"), F.chat.type == ChatType.PRIVATE, admin_only)
     async def login(message: Message) -> None:
-        if not is_admin(repo, cfg, message.from_user.id):
+        if not user_is_admin(repo, cfg, message.from_user):
             await message.answer("Вход на дашборд доступен только администраторам.")
             return
         if not cfg.dashboard_url:
@@ -252,9 +263,9 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
             disable_web_page_preview=True,
         )
 
-    @router.message(Command("run"), F.chat.type == ChatType.PRIVATE)
+    @router.message(Command("run"), F.chat.type == ChatType.PRIVATE, admin_only)
     async def run_now(message: Message) -> None:
-        if not is_admin(repo, cfg, message.from_user.id):
+        if not user_is_admin(repo, cfg, message.from_user):
             return
         if analyzer.running:
             await message.answer("Анализ уже идёт.")

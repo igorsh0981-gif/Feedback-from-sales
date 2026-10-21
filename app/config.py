@@ -31,6 +31,8 @@ class Config:
     sheet_id: str = ""
     google_service_account_json: str = ""
     admin_ids: set[int] = field(default_factory=set)
+    admin_usernames: set[str] = field(default_factory=set)
+    open_edit: bool = False
     service_channel_id: int | None = None
     dashboard_url: str = ""
     analysis_interval_min: int = 20
@@ -65,8 +67,10 @@ def load_config() -> Config:
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
         claude_model=os.getenv("CLAUDE_MODEL", "").strip() or "claude-sonnet-5-5",
         sheet_id=os.getenv("SHEET_ID", "").strip(),
-        google_service_account_json=os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "").strip(),
+        google_service_account_json=(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "") or os.getenv("GOOGLE_TOKEN_JSON", "")).strip(),
         admin_ids=_ids(os.getenv("ADMIN_IDS", "")),
+        admin_usernames={u.strip().lstrip("@").lower() for u in os.getenv("ADMIN_USERNAMES", "").split(",") if u.strip()},
+        open_edit=os.getenv("DASHBOARD_OPEN_EDIT", "").strip().lower() in {"1", "true", "yes"},
         service_channel_id=int(channel) if channel.lstrip("-").isdigit() else None,
         dashboard_url=os.getenv("DASHBOARD_URL", "").strip().rstrip("/"),
         analysis_interval_min=max(1, _int("ANALYSIS_INTERVAL_MIN", 20)),

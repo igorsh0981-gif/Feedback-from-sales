@@ -65,6 +65,22 @@ class Runtime:
                                         caption=f"Обезличено · {caption}"[:200], disable_notification=True)
         return msg.photo[-1].file_id
 
+    async def setup_commands(self) -> None:
+        """Меню команд видно только администраторам; остальным бот команды не показывает и не отвечает."""
+        from aiogram.types import BotCommand, BotCommandScopeChat, BotCommandScopeDefault
+
+        commands = [
+            BotCommand(command="login", description="Ссылка на дашборд"),
+            BotCommand(command="run", description="Запустить анализ"),
+            BotCommand(command="help", description="Что умеет бот"),
+        ]
+        try:
+            await self.bot.delete_my_commands(scope=BotCommandScopeDefault())
+            for uid in self.cfg.admin_ids:
+                await self.bot.set_my_commands(commands, scope=BotCommandScopeChat(chat_id=uid))
+        except Exception:
+            log.warning("Не удалось настроить меню команд", exc_info=True)
+
     # ------------------------------------------------------------ фоновые циклы
     async def scheduler(self) -> None:
         an = self.analyzer
@@ -218,6 +234,7 @@ class Runtime:
             dp = Dispatcher(storage=MemoryStorage())
             dp.include_router(build_router(self.repo, cfg, collector, self.analyzer, tokens))
             await self.bot.delete_webhook(drop_pending_updates=False)
+            await self.setup_commands()
             tasks.append(asyncio.create_task(dp.start_polling(
                 self.bot, handle_signals=False, close_bot_session=False,
                 allowed_updates=["message", "edited_message", "channel_post", "edited_channel_post",

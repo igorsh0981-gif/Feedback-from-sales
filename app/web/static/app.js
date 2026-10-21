@@ -36,10 +36,16 @@ function dateShift(date, n) { const d = new Date(date + 'T12:00:00Z'); d.setUTCD
 function plural(n, one, few, many) { n = Math.abs(n) % 100; const n1 = n % 10; if (n > 10 && n < 20) return many; if (n1 > 1 && n1 < 5) return few; if (n1 === 1) return one; return many; }
 function toast(text) { const e = $('toast'); e.textContent = text; e.style.display = 'block'; clearTimeout(window.__tt); window.__tt = setTimeout(() => e.style.display = 'none', 3800); }
 
+function storedActor() { try { return localStorage.getItem('fp_actor') || ''; } catch { return ''; } }
+S.actor = storedActor();
 async function api(method, path, body) {
+  if (method !== 'GET' && S.data?.me?.link && !S.actor && !path.startsWith('/api/auth') && path !== '/api/logout') {
+    openNameModal();
+    const err = new Error('Представьтесь — имя попадёт в журнал изменений'); err.errors = [err.message]; throw err;
+  }
   const res = await fetch(path, {
     method, credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-Actor': encodeURIComponent(S.actor || '') },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   let data = null;
@@ -84,7 +90,9 @@ function initials(name) { return (name || '?').split(/\s+/).filter(w => /^[\p{L}
 
 function renderFrame() {
   const m = S.data.meta, me = S.data.me;
-  $('sidebottom').innerHTML = `<div class="small" style="margin-bottom:16px"><span class="dot">●</span> ${m.demo ? 'Демо-режим' : 'Рабочий режим'} · ${m.classifier === 'claude' ? 'AI: Claude' : 'AI: правила'}</div>${me.admin
+  $('sidebottom').innerHTML = `<div class="small" style="margin-bottom:16px"><span class="dot">●</span> ${m.demo ? 'Демо-режим' : 'Рабочий режим'} · ${m.classifier === 'claude' ? 'AI: Claude' : 'AI: правила'}</div>${me.link
+    ? `<span class="avatar">${esc(initials(S.actor || 'Г'))}</span><b>${esc(S.actor || 'Гость')}</b><p class="small">Редактирование по ссылке · <button class="linkbtn" onclick="openNameModal()">${S.actor ? 'Сменить имя' : 'Представиться'}</button></p>`
+    : me.admin
     ? `<span class="avatar">${esc(initials(me.name))}</span><b>${esc(me.name)}</b><p class="small">Администратор · <button class="linkbtn" onclick="logout()">Выйти</button></p>`
     : `<span class="avatar">👁</span><b>Наблюдатель</b><p class="small">Только просмотр · <button class="linkbtn" onclick="openLogin()">Войти</button></p>`}`;
   $('topright').innerHTML = `<span class="demo">${m.demo ? 'ДЕМО' : 'FOCUS PULSE'}</span><span class="small">${showDate(m.now)}</span><span class="avatar">${me.admin ? esc(initials(me.name)) : '👁'}</span>`;
@@ -149,6 +157,16 @@ async function onTelegramAuth(user) {
 }
 async function logout() { await api('POST', '/api/logout', {}); await load(); toast('Вы вышли'); }
 function closeModal(id) { $(id).hidden = true; }
+function openNameModal() {
+  $('logincontent').innerHTML = `<button class="close" onclick="closeModal('loginmodal')" aria-label="Закрыть">✕</button><span class="ailabel">КТО ВНОСИТ ИЗМЕНЕНИЯ</span><h2>Представьтесь</h2><p class="small">Имя сохранится в этом браузере и будет записываться в журнал изменений рядом с каждым решением.</p><label class="field">Имя и роль<input id="actorName" maxlength="60" value="${attr(S.actor)}" placeholder="Например: Игорь, PM"></label><button class="primary" onclick="saveActor()">Сохранить</button>`;
+  $('loginmodal').hidden = false; setTimeout(() => $('actorName')?.focus(), 50);
+}
+function saveActor() {
+  const v = $('actorName').value.trim();
+  if (!v) { toast('Введите имя'); return; }
+  S.actor = v; try { localStorage.setItem('fp_actor', v); } catch { /* только на эту сессию */ }
+  closeModal('loginmodal'); render(); toast('Имя сохранено. Повторите действие');
+}
 
 // ---------------------------------------------------------------- выборка
 function viewItems() {

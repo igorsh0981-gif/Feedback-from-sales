@@ -103,7 +103,7 @@ def seed_demo(repo: Repo, xml_path: Path = DEMO_XML) -> None:
             "priority_ai": priority, "priority": priority, "status": status, "title": _txt(issue, "title"),
             "summary": _txt(issue, "text"), "reason_ai": _txt(issue, "reason"),
             "actual": _txt(issue, "text") if itype == "Баг" else "", "confidence": "0.62" if review else "0.86",
-            "owner": OWNER_FIX.get(iid, _txt(issue, "owner")), "accepted_by": "Демо-администратор" if accepted else "",
+            "owner": OWNER_FIX.get(iid, {"Продукт": "BA", "Дизайн": "BA"}.get(_txt(issue, "owner"), _txt(issue, "owner"))), "accepted_by": "Демо-администратор" if accepted else "",
             "accepted_at": dt(_txt(issue, "created"), "11:00") if accepted else "",
             "due": due if itype == "Баг" else "", "due_set_by": "Демо-администратор" if due and accepted else "",
             "resolved_at": d(_txt(issue, "resolvedAt")), "fix_version": _txt(issue, "fixVersion"),

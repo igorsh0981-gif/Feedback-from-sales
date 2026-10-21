@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import OrderedDict
+from urllib.parse import unquote
 from dataclasses import dataclass, field
 from datetime import timedelta
 from pathlib import Path
@@ -217,7 +218,8 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
                     "signals": to_int(r.get("signals")), "filtered": to_int(r.get("filtered")),
                     "review": to_int(r.get("review")), "errors": to_int(r.get("errors")), "waiting": 0}
     return {
-        "me": {"admin": bool(admin), "name": (admin or {}).get("name", ""), "uid": (admin or {}).get("uid")},
+        "me": {"admin": bool(admin), "name": (admin or {}).get("name", ""), "uid": (admin or {}).get("uid"),
+               "link": bool((admin or {}).get("link"))},
         "meta": {
             "demo": ctx.cfg.demo_mode, "bot_username": ctx.bot_username, "classifier": ctx.classifier_name,
             "running": an.running, "last_run": last_run,
@@ -247,10 +249,19 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
 
 
 # ---------------------------------------------------------------- middleware
+def _session(request: web.Request) -> dict | None:
+    ctx = request.app[CTX]
+    return read_session(ctx.cfg.session_secret, request.cookies.get(SESSION_COOKIE))
+
+
 def _admin(request: web.Request) -> dict | None:
     ctx = request.app[CTX]
-    data = read_session(ctx.cfg.session_secret, request.cookies.get(SESSION_COOKIE))
+    data = _session(request)
     if not data:
+        if ctx.cfg.open_edit:
+            # Режим «редактирует любой по ссылке»: имя берётся из заголовка, чтобы журнал показывал, кто менял.
+            name = unquote(request.headers.get("X-Actor", "")).strip()[:60]
+            return {"uid": 0, "name": name or "Гость", "link": True}
         return None
     uid = data.get("uid")
     if ctx.is_admin and isinstance(uid, int) and uid >= 0 and not ctx.is_admin(uid):
@@ -259,6 +270,8 @@ def _admin(request: web.Request) -> dict | None:
 
 
 def _actor(admin: dict) -> str:
+    if admin.get("link"):
+        return f"{admin.get('name', 'Гость')} (по ссылке)"
     return f"{admin.get('name', '')} ({admin.get('uid')})"
 
 
@@ -270,7 +283,7 @@ async def view_guard(request: web.Request, handler):
     if not token or request.path.startswith(open_paths):
         return await handler(request)
     expected = view_cookie_value(ctx.cfg.session_secret, token)
-    if request.cookies.get(VIEW_COOKIE) == expected or _admin(request):
+    if request.cookies.get(VIEW_COOKIE) == expected or _session(request):
         return await handler(request)
     if request.query.get("k") == token:
         resp = _redirect(request.path)
