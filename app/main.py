@@ -5,6 +5,7 @@ import asyncio
 import io
 import logging
 import signal
+import sys
 
 from aiohttp import web
 
@@ -259,7 +260,7 @@ class Runtime:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     logging.getLogger("aiogram.event").setLevel(logging.WARNING)
     cfg = load_config()
     rt = Runtime(cfg)
