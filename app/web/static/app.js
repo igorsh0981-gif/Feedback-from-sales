@@ -64,6 +64,9 @@ async function load(quiet = false) {
   try {
     S.data = await api('GET', '/api/state');
     S.lastLoad = Date.now();
+    // Выложена новая версия — перезагружаем страницу, чтобы не работать со старым кодом.
+    const mine = document.querySelector('meta[name="fp-build"]')?.content;
+    if (mine && S.data.meta.build && mine !== S.data.meta.build) { location.reload(); return; }
     if (!F.from) quickPeriod('week', false);
     render();
     if (S.data.meta.running) schedulePoll(3000);
@@ -78,8 +81,10 @@ setInterval(() => {
 }, 15000);
 
 // ---------------------------------------------------------------- навигация и рамка
-function go(v) {
+function go(v, keepFilters = false) {
   S.view = v; F.drill = ''; F.exec = '';
+  // Раздел из меню открывается без фильтров: фильтр, оставшийся с другой страницы, молча прятал обращения.
+  if (!keepFilters) for (const k of Object.keys(FILTER_LABELS)) F[k] = '';
   // Фильтр типа, несовместимый с разделом, молча обнулял список (например, «Баг» в «Пожелания и UX»).
   const allowed = { 'Баги': [], 'Вопросы': [], 'Пожелания и UX': ['Пожелание', 'UX'] }[v];
   if (allowed && !allowed.includes(F.type)) F.type = '';
@@ -324,10 +329,10 @@ function metrics(a) {
   const bugs = a.filter(i => i.type === 'Баг'), wishes = a.filter(i => ['Пожелание', 'UX'].includes(i.type)), qs = a.filter(i => i.type === 'Вопрос');
   const crit = bugs.filter(i => i.priority === 'Критичный' && !TERMINAL.includes(i.status)).length;
   const cards = [
-    ['Всего обращений', a.length, foot(a), "go('Все обращения')", `${a.reduce((s, i) => s + i.msg_count, 0)} сообщений · ${new Set(a.flatMap(i => i.reporters.map(r => r.author_id))).size} участников`],
-    ['Баги', bugs.length, foot(bugs), "go('Баги')", crit ? `критичных открытых: ${crit}` : ''],
-    ['Пожелания и UX', wishes.length, foot(wishes), "go('Пожелания и UX')", ''],
-    ['Вопросы', qs.length, foot(qs), "go('Вопросы')", ''],
+    ['Всего обращений', a.length, foot(a), "go('Все обращения', true)", `${a.reduce((s, i) => s + i.msg_count, 0)} сообщений · ${new Set(a.flatMap(i => i.reporters.map(r => r.author_id))).size} участников`],
+    ['Баги', bugs.length, foot(bugs), "go('Баги', true)", crit ? `критичных открытых: ${crit}` : ''],
+    ['Пожелания и UX', wishes.length, foot(wishes), "go('Пожелания и UX', true)", ''],
+    ['Вопросы', qs.length, foot(qs), "go('Вопросы', true)", ''],
   ];
   return `<div class="metrics">${cards.map(([t, n, f, act, extra]) => `<div class="metric" onclick="${act}"><span class="small">${t} ↗</span><div class="num">${n}</div><div class="foot">${esc(f)}</div>${extra ? `<div class="foot ${extra.startsWith('критичных') ? 'critical' : ''}" style="margin-top:4px">${esc(extra)}</div>` : ''}</div>`).join('')}</div>`;
 }
@@ -371,7 +376,7 @@ function rows() {
     return `<tr data-id="${attr(i.issue_id)}" tabindex="0" onclick="openDetail('${attr(i.issue_id)}')" onkeydown="if(event.key==='Enter'&&event.target===this)openDetail('${attr(i.issue_id)}')">
     <td class="authorcell"><b>${esc(r?.name || '—')}</b><small>${r?.username ? '@' + esc(r.username) : 'Username не указан'}</small>${i.reporters.length > 1 ? `<small>+ ${i.reporters.length - 1} ${plural(i.reporters.length - 1, 'участник', 'участника', 'участников')}</small>` : ''}</td>
     <td class="datecell">${showDate(i.created_at)} ${showTime(i.created_at)}<br><span class="badge platformbadge">${esc(i.platform || 'Не указана')}</span></td>
-    <td class="titlecell"><span class="id">${esc(i.issue_id)} · ${esc(i.section)}${i.operation ? ' / ' + esc(i.operation) : ''}</span><b>${esc(i.title)}</b><span class="small">${esc(i.app_version || 'версия не указана')} · ${esc(i.owner)} · ${i.participant_count} участн. / ${i.msg_count} сообщ.</span>${i.related.length ? `<div class="relatednotice">↶ ${i.related.map(r => `${esc(r.relation)}: ${esc(r.issue_id)}`).join(', ')}</div>` : ''}${S.view === 'На утверждение' ? `<div class="small" style="margin-top:4px">Уверенность AI: ${Math.round(i.confidence * 100)}%</div>` : ''}</td>
+    <td class="titlecell"><span class="id">${esc(i.issue_id)} · ${esc(i.section)}${i.operation ? ' / ' + esc(i.operation) : ''}</span><b>${esc(i.title)}</b><span class="small">${esc(i.app_version || 'версия не указана')} · ${esc(i.owner)} · ${i.participant_count} участн. / ${i.msg_count} сообщ.</span>${i.related.length ? `<div class="relatednotice">↶ ${i.related.map(r => `${esc(r.relation)}: ${esc(r.issue_id)}`).join(', ')}</div>` : ''}${S.view === 'На утверждение' && i.type_ai ? `<div class="small" style="margin-top:4px">Уверенность AI: ${Math.round(i.confidence * 100)}%</div>` : ''}</td>
     <td>${badge(i.type)}<div style="margin-top:7px">${statusBadge(i)}</div><div class="small ${i.priority === 'Критичный' ? 'critical' : ''}" style="margin-top:6px">${i.priority === 'Критичный' ? '● ' : ''}${esc(i.priority)}</div></td>
     <td>${sources(i)}</td>
     <td>${deadline(i)}</td>

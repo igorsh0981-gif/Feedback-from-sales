@@ -156,6 +156,17 @@ def in_review(rec: dict) -> bool:
 
 
 # ---------------------------------------------------------------- счётчики
+def short_title(text: str, fallback: str, limit: int = 80) -> str:
+    """Первая строка текста как заголовок; длинная обрезается по границе слова с многоточием."""
+    line = next((l.strip() for l in (text or "").splitlines() if l.strip()), "")
+    if not line:
+        return fallback
+    if len(line) <= limit:
+        return line
+    cut = line[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,.;:—-")
+    return (cut or line[: limit - 1]) + "…"
+
+
 def also_issues(m: dict) -> list[str]:
     """Дополнительные обращения сообщения, в котором несколько тем."""
     return [x for x in (m.get("also_issues") or "").split(",") if x]
@@ -367,7 +378,7 @@ def split_message(repo: Repo, msg_id: str, from_issue: str, actor: str) -> dict:
         "operation": src.get("operation", UNKNOWN_OPERATION), "platform": msg.get("platform") or src.get("platform") or NO_PLATFORM,
         "device": msg.get("device", ""), "app_version": msg.get("app_version", ""), "priority_ai": "",
         "priority": src.get("priority", "Средний"), "status": "Новое",
-        "title": (text.splitlines() or [""])[0][:80] or f"Выделено из {from_issue}", "summary": text,
+        "title": short_title(text, f"Выделено из {from_issue}"), "summary": text,
         "reason_ai": f"Администратор выделил сообщение из {from_issue}. Проверьте тип, раздел и заголовок.",
         "confidence": "", "owner": NO_OWNER,
     })
@@ -432,7 +443,7 @@ def message_action(repo: Repo, msg_id: str, action: str, actor: str, reason: str
             "type_ai": "", "type": "Вопрос", "section": OTHER_SECTION, "operation": UNKNOWN_OPERATION,
             "platform": msg.get("platform") or NO_PLATFORM, "device": msg.get("device", ""),
             "app_version": msg.get("app_version", ""), "priority_ai": "", "priority": "Средний",
-            "status": "Новое", "title": (text.splitlines() or ["Обращение из сообщения"])[0][:80] or "Обращение из сообщения",
+            "status": "Новое", "title": short_title(text, "Обращение из сообщения"),
             "summary": text, "reason_ai": "Создано администратором из сообщения. Определите тип и раздел.",
             "confidence": "", "owner": NO_OWNER,
         })

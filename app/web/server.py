@@ -52,6 +52,19 @@ from .auth import SESSION_COOKIE, VIEW_COOKIE, read_session, sign_session, verif
 
 log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
+
+
+def _build_id() -> str:
+    """Версия интерфейса — хэш статики: меняется с каждой выкладкой, по ней страница понимает, что её код устарел."""
+    import hashlib
+
+    h = hashlib.sha256()
+    for name in ("index.html", "app.js", "app.css"):
+        h.update((STATIC / name).read_bytes())
+    return h.hexdigest()[:12]
+
+
+BUILD = _build_id()
 DEMO_SCREENS = Path(__file__).resolve().parents[2] / "demo" / "screens"
 
 
@@ -229,6 +242,7 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
         "me": {"admin": bool(admin), "name": (admin or {}).get("name", ""), "uid": (admin or {}).get("uid"),
                "link": bool((admin or {}).get("link"))},
         "meta": {
+            "build": BUILD,
             "demo": ctx.cfg.demo_mode, "bot_username": ctx.bot_username, "classifier": ctx.classifier_name,
             "running": an.running, "last_run": last_run,
             "next_run_at": iso(an.next_run_at) if an.next_run_at else "",
@@ -336,7 +350,10 @@ async def _body(request: web.Request) -> dict:
 
 # ---------------------------------------------------------------- маршруты
 async def index(request: web.Request) -> web.Response:
-    return web.FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    html = html.replace('/static/app.css"', f'/static/app.css?v={BUILD}"').replace('/static/app.js"', f'/static/app.js?v={BUILD}"')
+    html = html.replace("<head>", f'<head>\n<meta name="fp-build" content="{BUILD}">', 1)
+    return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-store"})
 
 
 async def health(request: web.Request) -> web.Response:
