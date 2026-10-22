@@ -82,6 +82,21 @@ class Runtime:
         except Exception:
             log.warning("Не удалось настроить меню команд", exc_info=True)
 
+    def log_state(self) -> None:
+        """Сводка для диагностики: только идентификаторы и статусы, без текстов сообщений."""
+        from collections import Counter
+
+        for r in self.repo.rows("Issues"):
+            log.info("state issue %s type=%s status=%s accepted=%s merged=%s chats=%s msgs=%s created=%s",
+                     r.get("issue_id"), r.get("type"), r.get("status"), "yes" if r.get("accepted_by") else "no",
+                     r.get("merged_into") or "-", r.get("chats") or "-", r.get("msg_count") or "0", r.get("created_at"))
+        cnt = Counter((m.get("chat_id"), m.get("state"), m.get("issue_id") or "-", m.get("also_issues") or "-")
+                      for m in self.repo.rows("Messages"))
+        for (chat, state, iid, also), n in sorted(cnt.items()):
+            log.info("state messages chat=%s state=%s issue=%s also=%s n=%s", chat, state, iid, also, n)
+        for c in self.repo.rows("Chats"):
+            log.info("state chat %s active=%s", c.get("chat_id"), c.get("active"))
+
     # ------------------------------------------------------------ фоновые циклы
     async def scheduler(self) -> None:
         an = self.analyzer
@@ -169,6 +184,7 @@ class Runtime:
             seed_demo(self.repo)
             await self.repo.commit()
         await seed_operations(self.repo)
+        self.log_state()
 
         if cfg.claude_enabled:
             self.classifier = ClaudeClassifier(cfg.anthropic_api_key, cfg.claude_model)

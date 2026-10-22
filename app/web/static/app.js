@@ -78,7 +78,14 @@ setInterval(() => {
 }, 15000);
 
 // ---------------------------------------------------------------- навигация и рамка
-function go(v) { S.view = v; F.drill = ''; F.exec = ''; window.scrollTo(0, 0); render(); }
+function go(v) {
+  S.view = v; F.drill = ''; F.exec = '';
+  // Фильтр типа, несовместимый с разделом, молча обнулял список (например, «Баг» в «Пожелания и UX»).
+  const allowed = { 'Баги': [], 'Вопросы': [], 'Пожелания и UX': ['Пожелание', 'UX'] }[v];
+  if (allowed && !allowed.includes(F.type)) F.type = '';
+  if (F.status && v !== 'Все обращения' && v !== 'Обзор' && !(S.data.options.statuses[F.type] || Object.values(S.data.options.statuses).flat()).includes(F.status) && F.status !== 'На утверждении') F.status = '';
+  window.scrollTo(0, 0); render();
+}
 
 function renderNav() {
   const review = S.data.issues.filter(i => i.review).length;
@@ -261,7 +268,7 @@ function periodPanel() {
   const statuses = uniq([...(F.type ? o.statuses[F.type] : Object.values(o.statuses).flat())]);
   const sel = (key, label, values, all, labels) => `<label>${label}<select aria-label="${label}" onchange="setF('${key}',this.value)"><option value="">${all}</option>${opts(values, F[key], labels)}</select></label>`;
   return `<section class="periodpanel" aria-label="Период и фильтры">
-    ${reviewView ? '<div class="periodnote" style="margin:0 0 10px">Очередь утверждения показывает все новые обращения независимо от периода · сначала с низкой уверенностью AI</div>' : `<div class="periodrow"><label>Дата с<input id="periodFrom" type="date" value="${F.from}"></label><label>Дата по<input id="periodTo" type="date" value="${F.to}"></label><button class="primary" onclick="applyPeriod()">Показать период</button><button onclick="movePeriod(-1)" aria-label="Предыдущий период">←</button><button onclick="movePeriod(1)" aria-label="Следующий период">→</button><span class="periodnote">По дате выявления · включая обе границы</span></div>
+    ${reviewView ? '<div class="periodnote" style="margin:0 0 10px">Очередь утверждения показывает все новые обращения независимо от периода · сначала с низкой уверенностью AI. Обращения из очереди уже видны в своих разделах.</div>' : `<div class="periodrow"><label>Дата с<input id="periodFrom" type="date" value="${F.from}"></label><label>Дата по<input id="periodTo" type="date" value="${F.to}"></label><button class="primary" onclick="applyPeriod()">Показать период</button><button onclick="movePeriod(-1)" aria-label="Предыдущий период">←</button><button onclick="movePeriod(1)" aria-label="Следующий период">→</button><span class="periodnote">По дате выявления · включая обе границы</span></div>
     <div class="quickdates"><button onclick="quickPeriod('today')">Сегодня</button><button onclick="quickPeriod('week')">7 дней</button><button onclick="quickPeriod('month')">30 дней</button><button onclick="quickPeriod('all')">Все даты</button><button onclick="resetFilters()">Сбросить фильтры</button></div>
     <div id="periodError" class="perioderror" role="alert"></div>`}
     <div class="periodrow analytic-filters">
@@ -274,7 +281,28 @@ function periodPanel() {
       ${reviewView ? '' : sel('status', 'Статус', ['На утверждении', ...statuses], 'Все статусы')}
       ${sel('owner', 'Ответственный', uniq([...o.owners, ...S.data.issues.map(i => i.owner)]), 'Все')}
       ${sel('chat', 'Чат', S.data.chats.map(c => c.chat_id), 'Все чаты', S.data.chats.map(c => c.title))}
-    </div></section>`;
+    </div>${filterChips()}</section>`;
+}
+
+// Какие фильтры включены и сколько обращений раздела они прячут — чтобы счётчик и список не расходились молча.
+const FILTER_LABELS = { platform: 'Платформа', section: 'Раздел', operation: 'Операция', type: 'Тип', version: 'Версия', priority: 'Приоритет', status: 'Статус', owner: 'Ответственный', chat: 'Чат', exec: 'Исполнение', query: 'Поиск', initiator: 'Инициатор' };
+const EXEC_LABELS = { open: 'открытые', done: 'устранено / реализовано', late: 'просрочено', related: 'со связанной историей', unverified: 'скрин не проверен' };
+function activeFilters() {
+  return Object.keys(FILTER_LABELS).filter(k => F[k]).map(k => [k, FILTER_LABELS[k],
+    k === 'chat' ? chatTitle(F.chat) : k === 'exec' ? EXEC_LABELS[F.exec] || F.exec : F[k]]);
+}
+function hiddenByFilters() {
+  const reviewView = S.view === 'На утверждение';
+  const base = viewItems().filter(i => reviewView || (day(i.created_at) >= F.from && day(i.created_at) <= F.to)).length;
+  return Math.max(0, base - scoped().length);
+}
+function clearFilter(k) { F[k] = ''; if (k === 'section') F.operation = ''; F.drill = ''; render(); }
+function clearAllFilters() { for (const k of Object.keys(FILTER_LABELS)) F[k] = ''; F.drill = ''; render(); }
+function filterChips() {
+  const list = activeFilters();
+  if (!list.length) return '';
+  const hidden = hiddenByFilters();
+  return `<div class="filterchips"><span class="small">Включены фильтры:</span>${list.map(([k, label, v]) => `<button class="chip" onclick="clearFilter('${k}')" title="Снять фильтр">${esc(label)}: <b>${esc(v)}</b> ✕</button>`).join('')}<button class="linkbtn" onclick="clearAllFilters()">Снять все</button>${hidden ? `<span class="hiddencount">Скрыто фильтрами: ${hidden} ${plural(hidden, 'обращение', 'обращения', 'обращений')}</span>` : ''}</div>`;
 }
 
 function scopeStrip(a) {
@@ -284,13 +312,24 @@ function scopeStrip(a) {
 }
 
 function metrics(a) {
+  // Типы делят выборку без пересечений: Баги + Пожелания и UX + Вопросы = Всего.
+  // «На утверждении», «в работе», «закрыто» — статусы внутри каждого типа, а не отдельная группа.
+  const open = l => l.filter(i => !TERMINAL.includes(i.status)).length;
+  const closed = l => l.filter(i => TERMINAL.includes(i.status)).length;
+  const rev = l => l.filter(i => i.review).length;
+  const foot = (l, closedWord = 'закрыто') => {
+    const r = rev(l);
+    return `в работе ${open(l)} · ${closedWord} ${closed(l)}${r ? ` · из них ждут утверждения ${r}` : ''}`;
+  };
+  const bugs = a.filter(i => i.type === 'Баг'), wishes = a.filter(i => ['Пожелание', 'UX'].includes(i.type)), qs = a.filter(i => i.type === 'Вопрос');
+  const crit = bugs.filter(i => i.priority === 'Критичный' && !TERMINAL.includes(i.status)).length;
   const cards = [
-    ['Обращений в выборке', a.length, `${a.reduce((s, i) => s + i.msg_count, 0)} сообщений · ${new Set(a.flatMap(i => i.reporters.map(r => r.author_id))).size} участников`, "go('Все обращения')"],
-    ['Баги', a.filter(i => i.type === 'Баг').length, (n => `${n} ${plural(n, 'критичный открытый', 'критичных открытых', 'критичных открытых')}`)(a.filter(i => i.type === 'Баг' && i.priority === 'Критичный' && !TERMINAL.includes(i.status)).length), "go('Баги')"],
-    ['Пожелания и UX', a.filter(i => ['Пожелание', 'UX'].includes(i.type)).length, `Вопросов: ${a.filter(i => i.type === 'Вопрос').length}`, "go('Пожелания и UX')"],
-    ['На утверждении', S.data.issues.filter(i => i.review).length, 'Ждут решения администратора', "go('На утверждение')"],
+    ['Всего обращений', a.length, foot(a), "go('Все обращения')", `${a.reduce((s, i) => s + i.msg_count, 0)} сообщений · ${new Set(a.flatMap(i => i.reporters.map(r => r.author_id))).size} участников`],
+    ['Баги', bugs.length, foot(bugs), "go('Баги')", crit ? `критичных открытых: ${crit}` : ''],
+    ['Пожелания и UX', wishes.length, foot(wishes), "go('Пожелания и UX')", ''],
+    ['Вопросы', qs.length, foot(qs), "go('Вопросы')", ''],
   ];
-  return `<div class="metrics">${cards.map(([t, n, s, act], k) => `<div class="metric ${k === 3 && n ? 'alert' : ''}" onclick="${act}"><span class="small">${t} ↗</span><div class="num">${n}</div><div class="foot">${esc(s)}</div></div>`).join('')}</div>`;
+  return `<div class="metrics">${cards.map(([t, n, f, act, extra]) => `<div class="metric" onclick="${act}"><span class="small">${t} ↗</span><div class="num">${n}</div><div class="foot">${esc(f)}</div>${extra ? `<div class="foot ${extra.startsWith('критичных') ? 'critical' : ''}" style="margin-top:4px">${esc(extra)}</div>` : ''}</div>`).join('')}</div>`;
 }
 
 // ---------------------------------------------------------------- график
@@ -356,7 +395,7 @@ function registryPage() {
   const a = scoped();
   const reviewView = S.view === 'На утверждение';
   const reviewCount = S.data.issues.filter(i => i.review).length;
-  return `${periodPanel()}${reviewView ? '' : scopeStrip(a)}${S.view === 'Обзор' ? metrics(a) : ''}${S.view === 'Обзор' && reviewCount ? `<div class="banner" style="margin-top:20px"><div><b>◈ ${reviewCount} ${plural(reviewCount, 'обращение ждёт', 'обращения ждут', 'обращений ждут')} решения</b><span style="margin-left:12px;color:#788064">Проверьте классификацию AI и срок</span></div><button onclick="go('На утверждение')">Проверить →</button></div>` : ''}${reviewView ? '' : chart()}${registry(S.view === 'Обзор')}`;
+  return `${periodPanel()}${reviewView ? '' : scopeStrip(a)}${S.view === 'Обзор' ? metrics(a) : ''}${S.view === 'Обзор' && reviewCount ? `<div class="banner" style="margin-top:20px"><div><b>◈ ${reviewCount} ${plural(reviewCount, 'обращение ждёт', 'обращения ждут', 'обращений ждут')} утверждения</b><span style="margin-left:12px;color:#788064">Они уже в своих разделах (Баги, Пожелания, Вопросы). Утверждение — проверить тип, назначить ответственного и срок</span></div><button onclick="go('На утверждение')">Проверить →</button></div>` : ''}${reviewView ? '' : chart()}${registry(S.view === 'Обзор')}`;
 }
 
 function exportCSV() {
