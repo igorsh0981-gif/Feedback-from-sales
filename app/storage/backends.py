@@ -25,6 +25,7 @@ class Backend(Protocol):
     def read_columns(self, requests: dict[str, list[int]]) -> dict[str, list[list[str]]]: ...
     def append(self, tab: str, rows: list[list[str]]) -> None: ...
     def update(self, tab: str, updates: list[tuple[int, list[str]]]) -> None: ...
+    def delete_rows(self, tab: str, row_numbers: list[int]) -> None: ...
     def ping(self) -> None: ...
 
 
@@ -68,6 +69,13 @@ class MemoryBackend:
     def append(self, tab: str, rows: list[list[str]]) -> None:
         self._maybe_fail("append:" + tab)
         self.sheets.setdefault(tab, []).extend([list(r) for r in _clip_all(rows)])
+
+    def delete_rows(self, tab: str, row_numbers: list[int]) -> None:
+        self._maybe_fail("delete:" + tab)
+        sheet = self.sheets.get(tab, [])
+        for row in sorted(set(row_numbers), reverse=True):
+            if 2 <= row <= len(sheet):
+                del sheet[row - 1]
 
     def update(self, tab: str, updates: list[tuple[int, list[str]]]) -> None:
         self._maybe_fail("update:" + tab)
@@ -195,6 +203,16 @@ class SheetsBackend:
             return
         data = [{"range": f"{self._q(tab)}!A{row}", "values": [_clip(values)]} for row, values in updates]
         self._retry(lambda: self.sh.values_batch_update({"valueInputOption": "RAW", "data": data}))
+
+    def delete_rows(self, tab: str, row_numbers: list[int]) -> None:
+        """Удаляет строки (номера с 1, заголовок не трогается) одним запросом, снизу вверх."""
+        rows = sorted({r for r in row_numbers if r >= 2}, reverse=True)
+        if not rows:
+            return
+        sheet_id = self._worksheet(tab).id
+        requests = [{"deleteDimension": {"range": {"sheetId": sheet_id, "dimension": "ROWS",
+                                                   "startIndex": r - 1, "endIndex": r}}} for r in rows]
+        self._retry(lambda: self.sh.batch_update({"requests": requests}))
 
     def ping(self) -> None:
         self._retry(lambda: self.sh.values_get(f"{self._q('Settings')}!A1:B1"))

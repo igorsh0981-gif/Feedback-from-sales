@@ -153,6 +153,26 @@ class Repo:
     def _key_indexes(self, tab: str) -> list[int]:
         return [self.headers[tab].index(k) for k in SCHEMA[tab]["key"]]
 
+    async def delete_where(self, tabs_preds: dict) -> dict[str, int]:
+        """Удаляет строки по условию {вкладка: функция(запись) -> bool}. Сначала фиксирует изменения,
+        строки ищет по актуальному содержимому листа, после удаления перечитывает таблицу."""
+        await self.commit()
+        removed: dict[str, int] = {}
+        async with self._commit_lock:
+            data = await asyncio.to_thread(self.backend.read_all, list(tabs_preds))
+            for tab, pred in tabs_preds.items():
+                rows = data.get(tab) or []
+                if not rows:
+                    continue
+                header = [h.strip() for h in rows[0]]
+                hit = [i + 1 for i, row in enumerate(rows) if i > 0 and any(str(c).strip() for c in row)
+                       and pred({col: (str(row[j]) if j < len(row) else "") for j, col in enumerate(header)})]
+                if hit:
+                    await asyncio.to_thread(self.backend.delete_rows, tab, hit)
+                removed[tab] = len(hit)
+            await self.load()
+        return removed
+
     async def commit(self) -> int:
         """Пишет накопленные изменения. Возвращает число записанных строк."""
         async with self._commit_lock:

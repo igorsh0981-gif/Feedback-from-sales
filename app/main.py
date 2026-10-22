@@ -184,6 +184,16 @@ class Runtime:
             seed_demo(self.repo)
             await self.repo.commit()
         await seed_operations(self.repo)
+        # Разовая очистка тестовых чатов: PURGE_CHAT_IDS=-100…,-100… (после запуска переменную убрать).
+        import os
+
+        from .maintenance import purge_chat
+
+        for cid in [c.strip() for c in os.getenv("PURGE_CHAT_IDS", "").split(",") if c.strip()]:
+            try:
+                await purge_chat(self.repo, cid)
+            except Exception:
+                log.exception("Очистка чата %s не удалась", cid)
         self.log_state()
 
         if cfg.claude_enabled:
