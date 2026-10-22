@@ -88,7 +88,7 @@ async def test_deleted_row_is_appended_again(repo):
 
 async def test_extra_user_columns_preserved(repo):
     repo.backend.sheets["Chats"][0].append("заметка")
-    repo.backend.sheets["Chats"].append(["-1", "Чат", "", "1", "", "важный"])
+    repo.backend.sheets["Chats"].append(["-1", "Чат", "", "1", "", "", "важный"])
     await repo.load()
     repo.update("Chats", "-1", {"title": "Чат 2"})
     await repo.commit()

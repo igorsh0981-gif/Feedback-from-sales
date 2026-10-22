@@ -30,6 +30,7 @@ const showDT = iso => iso ? `${showDate(iso)} ${showTime(iso)}` : '—';
 const today = () => day(S.data?.meta?.now) || new Date().toISOString().slice(0, 10);
 const isAdmin = () => !!S.data?.me?.admin;
 const opts = (values, current, labels) => values.map((v, n) => `<option value="${attr(v)}" ${v === current ? 'selected' : ''}>${esc(labels ? labels[n] : v)}</option>`).join('');
+const liveChats = () => S.data.chats.filter(c => !c.removed_at);  // чаты, где бот есть сейчас
 const chatTitle = id => (S.data.chats.find(c => c.chat_id === id) || {}).title || id;
 const issueById = id => S.data.issues.find(i => i.issue_id === id);
 function dateShift(date, n) { const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
@@ -291,7 +292,7 @@ function periodPanel() {
       ${sel('priority', 'Приоритет', o.priorities, 'Все приоритеты')}
       ${reviewView ? '' : sel('status', 'Статус', ['На утверждении', ...statuses], 'Все статусы')}
       ${sel('owner', 'Ответственный', uniq([...o.owners, ...S.data.issues.map(i => i.owner)]), 'Все')}
-      ${sel('chat', 'Чат', S.data.chats.map(c => c.chat_id), 'Все чаты', S.data.chats.map(c => c.title))}
+      ${sel('chat', 'Чат', liveChats().map(c => c.chat_id), 'Все чаты', liveChats().map(c => c.title))}
     </div>${filterChips()}</section>`;
 }
 
@@ -670,7 +671,7 @@ function inboxPage() {
   const open = S.data.issues.filter(i => !i.merged_into && !TERMINAL.includes(i.status));
   const admin = isAdmin();
   return `<div class="banner"><span><b>Ничего не удаляется.</b> Приветствия, реакции и организационные вопросы исключаются из реестра правилами без AI. Уточнения сохраняются в карточке, неясные сообщения проверяет администратор.</span></div>
-  <section class="panel"><div class="panelhead"><h2>Сообщения из чатов</h2><select aria-label="Чат" onchange="S.inboxChat=this.value;render()"><option value="">Все чаты</option>${opts(S.data.chats.map(c => c.chat_id), S.inboxChat, S.data.chats.map(c => c.title))}</select></div>
+  <section class="panel"><div class="panelhead"><h2>Сообщения из чатов</h2><select aria-label="Чат" onchange="S.inboxChat=this.value;render()"><option value="">Все чаты</option>${opts(liveChats().map(c => c.chat_id), S.inboxChat, liveChats().map(c => c.title))}</select></div>
   <div class="chipbar">${['Все', ...MSG_STATES].map(s => `<button class="${S.inboxState === s ? 'active' : ''}" onclick="S.inboxState='${s}';render()">${s}<span class="pillcount">${s === 'Все' ? msgs.length : counts[s]}</span></button>`).join('')}</div>
   ${list.map(m => `<div class="incoming"><div><span class="source">${esc(m.chat)}</span><span class="small"> · ${showDT(m.sent_at)}</span><div class="authormeta">Автор: ${esc(m.author)} · ID ${esc(m.author_id)}${m.app_version ? ' · версия ' + esc(m.app_version) : ''}</div><p>${esc(m.text || (m.kind === 'voice' ? '🎤 Голосовое сообщение' : m.kind === 'photo' ? '(скриншот)' : '(без текста)'))}</p>${m.screens.length ? `<div class="small">${m.screens.map(s => s.status === 'ok' ? `<button class="linkbtn" onclick="viewImage('${attr(m.msg_id)}',${s.idx})">🖼 скрин</button>` : `🖼 ${s.status === 'pending' ? 'обрабатывается' : 'не проверен'}`).join(' · ')}</div>` : ''}${m.mask_summary ? `<span class="maskchip">скрыто: ${esc(m.mask_summary)}</span>` : ''}${m.link ? ` <a class="small" href="${attr(m.link)}" target="_blank" rel="noopener">в чате ↗</a>` : ''}${m.issue_id ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${[m.issue_id, ...(m.also || [])].map(id => `<button onclick="openDetail('${attr(id)}')">Открыть ${esc(id)} →</button>`).join('')}</div>` : ''}</div>
   <div><span class="badge ${m.state === 'На проверке' ? 'review' : m.state === 'Учтено' ? 'approved' : ''}">${esc(m.state)}</span>${m.by ? `<span class="small"> · ${esc(m.by)}</span>` : ''}<p class="reasonline">${esc(m.reason)}</p>${admin ? inboxActions(m, open) : ''}</div></div>`).join('') || '<div class="empty">В этой категории нет сообщений.</div>'}
@@ -699,9 +700,9 @@ async function msgAction(msgId, action) {
 // ---------------------------------------------------------------- источники
 function sourcesPage() {
   const admin = isAdmin();
-  if (!S.data.chats.length) return `<div class="banner"><span>Чатов пока нет. Администратор добавляет бота в действующий чат фокус-группы — чат подключается автоматически.</span></div>`;
+  if (!liveChats().length) return `<div class="banner"><span>Чатов пока нет. Администратор добавляет бота в действующий чат фокус-группы — чат подключается автоматически.</span></div>`;
   return `<div class="banner"><span>Чтобы подключить чат, администратор добавляет в него бота — чат подключается сам. Если бота добавил кто-то другой, отправьте в чате <code>/connect</code>. У бота должен быть отключён privacy mode в BotFather (или бот — админ чата). Участникам ничего делать не нужно: платформу, телефон и версию бот берёт из их сообщений и скриншотов.</span></div>
-  <div class="grid3">${S.data.chats.map(c => {
+  <div class="grid3">${liveChats().map(c => {
     const n = S.data.issues.filter(i => i.chats.includes(c.chat_id) && !i.merged_into).length;
     return `<section class="panel chatcard"><span class="chaticon">↗</span><h2>${esc(c.title)}</h2><span class="badge ${c.active === '1' ? 'approved' : ''}">${c.active === '1' ? 'Собираем сообщения' : 'Отключён'}</span><p>Telegram · ${c.participants} ${plural(c.participants, 'автор', 'автора', 'авторов')} · ${c.messages} сообщ.<br>Последнее сообщение: ${c.last_message_at ? showDT(c.last_message_at) : '—'}<br>Платформа по умолчанию: ${esc(c.default_platform || 'не задана')}</p>
     ${admin ? `<label class="field">Платформа по умолчанию<select onchange="chatUpdate('${attr(c.chat_id)}',{default_platform:this.value})">${opts(['', 'iOS', 'Android'], c.default_platform, ['Не задана', 'iOS', 'Android'])}</select></label><button onclick="chatUpdate('${attr(c.chat_id)}',{active:${c.active === '1' ? 'false' : 'true'}})">${c.active === '1' ? 'Отключить сбор' : 'Включить сбор'}</button>` : ''}

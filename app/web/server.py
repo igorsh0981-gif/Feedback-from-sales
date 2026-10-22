@@ -223,7 +223,7 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
     chats = []
     for c in repo.rows("Chats"):
         st = chat_stats.get(c["chat_id"], {"messages": 0, "last": "", "authors": set()})
-        chats.append({**{k: c.get(k, "") for k in ("chat_id", "title", "default_platform", "active", "added_at")},
+        chats.append({**{k: c.get(k, "") for k in ("chat_id", "title", "default_platform", "active", "added_at", "removed_at")},
                       "messages": st["messages"], "last_message_at": st["last"], "participants": len(st["authors"])})
     audit_rows = repo.rows("Audit")[-400:][::-1]
     runs = sorted(repo.rows("Runs"), key=lambda r: r.get("started_at", ""), reverse=True)[:40]

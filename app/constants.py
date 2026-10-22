@@ -88,7 +88,7 @@ SCHEMA: dict[str, dict] = {
     },
     "Chats": {
         "key": ["chat_id"],
-        "cols": ["chat_id", "title", "default_platform", "active", "added_at"],
+        "cols": ["chat_id", "title", "default_platform", "active", "added_at", "removed_at"],
     },
     "Operations": {
         "key": ["section", "operation"],

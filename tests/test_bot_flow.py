@@ -158,3 +158,21 @@ async def test_admin_by_username():
     from aiogram.types import User
     assert user_is_admin(repo, cfg, User(id=5, is_bot=False, first_name="I", username="IgorSh_Uz"))
     assert not user_is_admin(repo, cfg, User(id=6, is_bot=False, first_name="X", username="other"))
+
+
+async def test_bot_removed_hides_or_deletes_chat():
+    from app.bot.handlers import mark_chat_removed
+    from app.storage.backends import MemoryBackend
+    from app.storage.repo import Repo
+
+    repo = Repo(MemoryBackend())
+    await repo.init()
+    repo.insert("Chats", {"chat_id": "-1", "title": "пустой тест", "active": "1"})
+    repo.insert("Chats", {"chat_id": "-2", "title": "с данными", "active": "1"})
+    repo.insert("Messages", {"msg_id": "-2:1", "chat_id": "-2", "state": "Учтено", "issue_id": "FP-001"})
+    await repo.commit()
+    await mark_chat_removed(repo, "-1", "Админ")
+    await mark_chat_removed(repo, "-2", "Админ")
+    assert repo.get("Chats", "-1") is None and all(r[0] != "-1" for r in repo.backend.sheets["Chats"][1:])
+    rec = repo.get("Chats", "-2")
+    assert rec["removed_at"] and rec["active"] == "0"

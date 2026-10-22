@@ -262,6 +262,12 @@ class Runtime:
             dp.include_router(build_router(self.repo, cfg, collector, self.analyzer, tokens))
             await self.bot.delete_webhook(drop_pending_updates=False)
             await self.setup_commands()
+            from .bot.handlers import sync_chats
+
+            try:
+                await sync_chats(self.bot, self.repo)
+            except Exception:
+                log.warning("Сверка чатов не удалась", exc_info=True)
             tasks.append(asyncio.create_task(dp.start_polling(
                 self.bot, handle_signals=False, close_bot_session=False,
                 allowed_updates=["message", "edited_message", "channel_post", "edited_channel_post",

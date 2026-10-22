@@ -9,7 +9,7 @@ import time
 
 from aiogram import Bot, F, Router
 from aiogram.enums import ChatType
-from aiogram.filters import Command, CommandObject, CommandStart, ChatMemberUpdatedFilter, JOIN_TRANSITION
+from aiogram.filters import Command, CommandObject, CommandStart, ChatMemberUpdatedFilter, JOIN_TRANSITION, LEAVE_TRANSITION
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, ChatMemberUpdated, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -152,6 +152,11 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
     async def channel_edit(message: Message) -> None:
         collector.store_edit(message)
 
+    @router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=LEAVE_TRANSITION))
+    async def bot_removed(event: ChatMemberUpdated) -> None:
+        """Бота удалили из группы или канала — чат пропадает из источников, сбор выключается."""
+        await mark_chat_removed(repo, str(event.chat.id), f"{event.from_user.full_name} ({event.from_user.id})")
+
     @router.my_chat_member(ChatMemberUpdatedFilter(member_status_changed=JOIN_TRANSITION))
     async def bot_added(event: ChatMemberUpdated, bot: Bot) -> None:
         if event.chat.type not in SOURCES:
@@ -163,7 +168,9 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
             repo.insert("Chats", {"chat_id": chat_id, "title": event.chat.title or "", "default_platform": "",
                                   "active": "1" if by_admin else "0", "added_at": iso()})
         elif by_admin:
-            repo.update("Chats", chat_id, {"active": "1", "title": event.chat.title or rec.get("title", "")})
+            repo.update("Chats", chat_id, {"active": "1", "removed_at": "", "title": event.chat.title or rec.get("title", "")})
+        else:
+            repo.update("Chats", chat_id, {"removed_at": ""})
         if by_admin:
             audit(repo, f"{event.from_user.full_name} ({event.from_user.id})", chat_id, "Активен", "", "1")
         await repo.commit()
@@ -280,6 +287,40 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
             )
 
     return router
+
+
+async def mark_chat_removed(repo: Repo, chat_id: str, actor: str) -> None:
+    """Чат без сообщений удаляется из таблицы; с сообщениями — остаётся для истории обращений, но скрыт."""
+    rec = repo.get("Chats", chat_id)
+    if not rec or rec.get("removed_at"):
+        return
+    if any(m.get("chat_id") == chat_id for m in repo.rows("Messages")):
+        repo.update("Chats", chat_id, {"active": "0", "removed_at": iso()})
+        audit(repo, actor, chat_id, "Бот удалён из чата", rec.get("title", ""), "")
+        await repo.commit()
+    else:
+        await repo.delete_where({"Chats": lambda r: r.get("chat_id") == chat_id})
+    log.info("Бот удалён из чата %s (%s)", chat_id, rec.get("title", ""))
+
+
+async def sync_chats(bot: Bot, repo: Repo) -> None:
+    """При запуске: чаты, из которых бота удалили, пока сервис не работал, — тоже убрать из источников."""
+    from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+
+    me = await bot.get_me()
+    for rec in list(repo.rows("Chats")):
+        if rec.get("removed_at"):
+            continue
+        try:
+            member = await bot.get_chat_member(int(rec["chat_id"]), me.id)
+            gone = member.status in ("left", "kicked")
+        except (TelegramForbiddenError, TelegramBadRequest) as exc:
+            gone = "not found" in str(exc).lower() or isinstance(exc, TelegramForbiddenError)
+        except Exception:
+            log.warning("Не удалось проверить чат %s", rec["chat_id"], exc_info=True)
+            continue
+        if gone:
+            await mark_chat_removed(repo, rec["chat_id"], "Проверка при запуске")
 
 
 def _actor(message: Message) -> str:
