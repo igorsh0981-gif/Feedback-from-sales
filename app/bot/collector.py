@@ -10,7 +10,7 @@ from aiogram.types import Message
 from ..constants import LINKED_STATES, MSG_QUEUED
 from ..masking.image import mask_image
 from ..masking.text import mask_text, merge_summaries
-from ..services import recount_issue
+from ..services import also_issues, recount_issue
 from ..storage.repo import Repo
 from ..util import chat_link, iso, jdumps, jloads
 
@@ -160,11 +160,13 @@ class Collector:
         if rec.get("state") in LINKED_STATES and prev_issue:
             issue = self.repo.get("Issues", prev_issue)
             if issue and not issue.get("accepted_by"):
-                changes.update({"state": MSG_QUEUED, "issue_id": "",
+                changes.update({"state": MSG_QUEUED, "issue_id": "", "also_issues": "",
                                 "state_reason": f"Изменено автором, повторный анализ (было в {prev_issue})"})
+        extra = also_issues(rec)
         self.repo.update("Messages", msg_id, changes)
         if changes.get("state") == MSG_QUEUED and prev_issue:
-            recount_issue(self.repo, prev_issue)
+            for iid in [prev_issue] + extra:
+                recount_issue(self.repo, iid)
         return rec
 
     # ---------------------------------------------------------------- скриншоты

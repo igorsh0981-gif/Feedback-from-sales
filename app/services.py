@@ -156,14 +156,21 @@ def in_review(rec: dict) -> bool:
 
 
 # ---------------------------------------------------------------- счётчики
+def also_issues(m: dict) -> list[str]:
+    """Дополнительные обращения сообщения, в котором несколько тем."""
+    return [x for x in (m.get("also_issues") or "").split(",") if x]
+
+
+def message_in_issue(m: dict, issue_id: str) -> bool:
+    return m.get("state") in LINKED_STATES and (m.get("issue_id") == issue_id or issue_id in also_issues(m))
+
+
 def recount_issue(repo: Repo, issue_id: str) -> None:
     rec = repo.get("Issues", issue_id)
     if not rec:
         return
-    msgs = [m for m in repo.rows("Messages") if m.get("issue_id") == issue_id and m.get("state") in LINKED_STATES]
-    for child in repo.rows("Issues"):
-        if child.get("merged_into") == issue_id:
-            msgs += [m for m in repo.rows("Messages") if m.get("issue_id") == child["issue_id"] and m.get("state") in LINKED_STATES]
+    ids = {issue_id} | {c["issue_id"] for c in repo.rows("Issues") if c.get("merged_into") == issue_id}
+    msgs = [m for m in repo.rows("Messages") if any(message_in_issue(m, i) for i in ids)]
     authors = join_list(m.get("author_id", "") for m in sorted(msgs, key=lambda m: m.get("sent_at", "")))
     chats = join_list(m.get("chat_id", "") for m in msgs)
     unverified = any(m.get("screen_status") == "unverified" for m in msgs)
@@ -292,14 +299,15 @@ def set_message_state(repo: Repo, msg_id: str, state: str, reason: str, actor: s
     msg = repo.get("Messages", msg_id)
     if not msg:
         raise ValidationError([f"Сообщение {msg_id} не найдено"])
-    prev_issue = msg.get("issue_id", "")
+    prev = {msg.get("issue_id", "")} | set(also_issues(msg))
     old = repo.update("Messages", msg_id, {
-        "state": state, "state_reason": reason, "state_by": actor, "issue_id": issue_id, "updated_at": iso(),
+        "state": state, "state_reason": reason, "state_by": actor, "issue_id": issue_id, "also_issues": "",
+        "updated_at": iso(),
     })
     for field in ("state", "issue_id"):
         if field in old:
             audit(repo, actor, msg_id, FIELD_NAMES[field], old[field], msg.get(field, ""))
-    for iid in {prev_issue, issue_id} - {""}:
+    for iid in (prev | {issue_id}) - {""}:
         recount_issue(repo, iid)
     return msg
 

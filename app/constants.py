@@ -106,7 +106,7 @@ SCHEMA: dict[str, dict] = {
             "msg_id", "chat_id", "chat_title", "message_id", "thread_id", "reply_to", "media_group_id",
             "author_id", "author_name", "sent_at", "edited_at", "kind", "platform", "device", "app_version",
             "text_masked", "screens", "screen_status", "raw_files", "mask_summary", "link", "episode_id",
-            "state", "state_reason", "state_by", "issue_id", "updated_at",
+            "state", "state_reason", "state_by", "issue_id", "updated_at", "also_issues",
         ],
     },
     "Issues": {

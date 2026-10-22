@@ -254,3 +254,23 @@ async def test_old_service_messages_cleaned_from_issue():
     m = repo.get("Messages", svc["msg_id"])
     assert m["state"] == "Отфильтровано" and not m["issue_id"]
     assert repo.get("Issues", "FP-001")["msg_count"] == "1"
+
+
+async def test_one_message_with_two_topics_goes_to_both_issues():
+    repo = await make_repo()
+    msg = add_msg(repo, "Добавьте кнопку Конвертация на главный экран.\n\nИ после регистрации не подтягиваются карты",
+                  author="u1", minutes_ago=30)
+    wish = {**BUG, "type": "Пожелание", "priority": "Низкий", "title": "Кнопка Конвертация на главном экране"}
+    clf = ScriptedClassifier(
+        {**wish, "parts": [{"messages": [1], "topic": "кнопка Конвертация"}, {"messages": [1], "topic": "карты после регистрации"}]},
+        wish, BUG)
+    res = await Analyzer(repo, clf, pause_min=10).run("test", force=True)
+    assert res.new_issues == 2 and res.claude_calls == 3
+    assert [i.focus for i in clf.inputs[1:]] == ["кнопка Конвертация", "карты после регистрации"]
+    m = repo.get("Messages", msg["msg_id"])
+    assert m["state"] == "Учтено" and m["issue_id"] == "FP-001" and m["also_issues"] == "FP-002"
+    assert repo.get("Issues", "FP-001")["msg_count"] == "1" and repo.get("Issues", "FP-002")["msg_count"] == "1"
+    # «Отвязать и проверить» снимает сообщение с обоих обращений
+    from app.services import message_action
+    message_action(repo, msg["msg_id"], "reanalyze", "Админ")
+    assert repo.get("Issues", "FP-002")["msg_count"] == "0" and not repo.get("Messages", msg["msg_id"])["also_issues"]

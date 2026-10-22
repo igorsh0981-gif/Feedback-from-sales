@@ -39,6 +39,7 @@ class EpisodeInput:
     messages: list[EpisodeMessage]
     images: list[bytes] = field(default_factory=list)
     allow_split: bool = True
+    focus: str = ""
     context_before: list[str] = field(default_factory=list)
     reply_texts: list[str] = field(default_factory=list)
     reply_issue: str = ""
@@ -67,7 +68,7 @@ class Analysis:
     relation: str = "none"
     confidence: float = 0.0
     reason: str = ""
-    parts: list[list[int]] = field(default_factory=list)
+    parts: list[tuple[list[int], str]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "Analysis":
@@ -101,10 +102,16 @@ class Analysis:
         parts = d.get("parts") or []
         if isinstance(parts, list):
             for p in parts[:10]:
+                topic = ""
+                if isinstance(p, dict):
+                    topic = str(p.get("topic") or "").strip()[:200]
+                    p = p.get("messages") or []
+                if isinstance(p, (int, float)):
+                    p = [p]
                 if isinstance(p, list):
                     nums = sorted({int(x) for x in p if isinstance(x, (int, float)) or str(x).strip().isdigit()})
                     if nums:
-                        a.parts.append(nums)
+                        a.parts.append((nums, topic))
         return a
 
 
@@ -149,7 +156,7 @@ priority:
 - reason — 1–3 предложения по-русски: почему такой тип, приоритет и совпадение.
 - confidence — уверенность в kind и type от 0 до 1.
 - Контекст беседы до эпизода дан только для понимания; классифицируй сам эпизод.
-- parts — если в эпизоде несколько РАЗНЫХ обращений в разных сообщениях (например, баг и отдельное пожелание), раздели номера сообщений [#N] по обращениям: [[1,2],[3]]. Уточнения и скриншоты относи к тому обращению, к которому они относятся. Если обращение одно — оставь parts пустым. Остальные поля тогда заполни по первой группе."""
+- parts — если в эпизоде несколько РАЗНЫХ обращений (например, баг и отдельное пожелание) — в разных сообщениях или даже в одном сообщении, — перечисли их: для каждого обращения номера сообщений [#N] и короткую тему: [{"messages":[1,2],"topic":"карты не подтягиваются после регистрации"},{"messages":[3],"topic":"кнопка Конвертация на главном"}]. Если в одном сообщении две темы, укажи его номер в обеих группах. Уточнения и скриншоты относи к своему обращению. Если обращение одно — оставь parts пустым. Остальные поля тогда заполни по первой группе."""
 
 TOOL = {
     "name": "submit_analysis",
@@ -176,8 +183,10 @@ TOOL = {
             "relation": {"type": "string", "enum": RELATIONS},
             "confidence": {"type": "number"},
             "reason": {"type": "string"},
-            "parts": {"type": "array", "items": {"type": "array", "items": {"type": "integer"}},
-                      "description": "Группы номеров сообщений, если в эпизоде несколько разных обращений; иначе пусто"},
+            "parts": {"type": "array", "items": {"type": "object", "properties": {
+                          "messages": {"type": "array", "items": {"type": "integer"}},
+                          "topic": {"type": "string"}}, "required": ["messages", "topic"]},
+                      "description": "Обращения эпизода, если их несколько (одно сообщение может входить в несколько); иначе пусто"},
         },
         "required": ["kind", "type", "section", "priority", "title", "relation", "confidence", "reason"],
     },
@@ -222,6 +231,9 @@ def render_episode(ep: EpisodeInput) -> str:
         ocr = "".join(f"\n  Текст со скрина: {o[:600]}" for o in m.screens_ocr if o)
         msg_lines.append(f"{head}: {body}{ocr}")
     parts.append("ЭПИЗОД:\n" + "\n".join(msg_lines))
+    if ep.focus:
+        parts.append(f"Разбери только эту тему: «{ep.focus}». Другие темы в этих сообщениях — отдельные обращения, "
+                     "их не учитывай ни в title, ни в summary, ни в шагах.")
     if not ep.allow_split:
         parts.append("Эпизод уже выделен из более крупного разговора как одно обращение — parts не заполняй.")
     if ep.images:

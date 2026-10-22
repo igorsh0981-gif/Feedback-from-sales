@@ -33,6 +33,7 @@ from ..pipeline.jira_text import build_jira_text
 from ..services import (
     FIELD_NAMES,
     ValidationError,
+    also_issues,
     audit,
     audit_changes,
     default_due,
@@ -93,6 +94,7 @@ def message_view(m: dict, titles: dict[str, str]) -> dict:
         "author_id": m.get("author_id", ""), "author": m.get("author_name", ""), "sent_at": m.get("sent_at", ""),
         "kind": m.get("kind", ""), "text": m.get("text_masked", ""), "state": m.get("state", ""),
         "reason": m.get("state_reason", ""), "by": m.get("state_by", ""), "issue_id": m.get("issue_id", ""),
+        "also": also_issues(m),
         "link": m.get("link", ""), "screens": screens, "mask_summary": m.get("mask_summary", ""),
         "platform": m.get("platform", ""), "device": m.get("device", ""), "app_version": m.get("app_version", ""),
         "edited": bool(m.get("edited_at")),
@@ -103,14 +105,16 @@ def _messages_by_issue(repo: Repo) -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {}
     merged = {r["issue_id"]: r["merged_into"] for r in repo.rows("Issues") if r.get("merged_into")}
     for m in repo.rows("Messages"):
-        if m.get("state") in LINKED_STATES and m.get("issue_id"):
-            iid = m["issue_id"]
+        if m.get("state") not in LINKED_STATES or not m.get("issue_id"):
+            continue
+        for iid in [m["issue_id"]] + also_issues(m):
             out.setdefault(iid, []).append(m)
             seen = {iid}
             while iid in merged and merged[iid] not in seen:
                 iid = merged[iid]
                 seen.add(iid)
-                out.setdefault(iid, []).append(m)
+                if m not in out.setdefault(iid, []):
+                    out[iid].append(m)
     for msgs in out.values():
         msgs.sort(key=lambda m: m.get("sent_at", ""))
     return out

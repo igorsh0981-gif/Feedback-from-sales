@@ -62,6 +62,14 @@ def episode_device(ep: Episode, analysis: Analysis) -> str:
 
 def _set_messages(repo: Repo, ep: Episode, state: str, reason: str, issue_id: str = "") -> None:
     for m in ep.messages:
+        if m["msg_id"] in ep.shared:
+            # Сообщение уже учтено в соседнем обращении: добавляем ещё одно, состояние не трогаем.
+            if issue_id:
+                cur = repo.get("Messages", m["msg_id"]) or m
+                also = [x for x in (cur.get("also_issues") or "").split(",") if x]
+                if issue_id != cur.get("issue_id") and issue_id not in also:
+                    repo.update("Messages", m["msg_id"], {"also_issues": ",".join(also + [issue_id]), "updated_at": iso()})
+            continue
         repo.update("Messages", m["msg_id"], {
             "state": state, "state_reason": reason, "state_by": AI, "issue_id": issue_id,
             "episode_id": ep.id, "updated_at": iso(),

@@ -22,6 +22,8 @@ class Episode:
     messages: list[dict]
     reply_issue: str = ""
     reply_texts: list[str] = field(default_factory=list)
+    focus: str = ""
+    shared: set[str] = field(default_factory=set)  # сообщения, уже учтённые в соседнем обращении из того же сообщения
 
     @property
     def chat_id(self) -> str:
@@ -60,28 +62,32 @@ class _DSU:
             self.p[rb] = ra
 
 
-def split_episode(ep: Episode, parts: list[list[int]]) -> list[Episode]:
-    """Делит эпизод по группам номеров сообщений (1…N) от Claude. Меньше двух непустых групп — без деления.
-    Сообщения вне групп относятся к группе ближайшего предыдущего сообщения."""
+def split_episode(ep: Episode, parts: list[tuple[list[int], str]]) -> list[Episode]:
+    """Делит эпизод по обращениям от Claude: номера сообщений (1…N) и тема. Одно сообщение может входить
+    в несколько обращений. Меньше двух непустых групп — без деления. Сообщения вне групп относятся
+    к группе ближайшего предыдущего сообщения."""
     n = len(ep.messages)
-    owner: dict[int, int] = {}
-    for g, nums in enumerate(parts):
-        for x in nums:
-            if 1 <= x <= n and x not in owner:
-                owner[x] = g
-    used = sorted(set(owner.values()))
-    if len(used) < 2:
+    groups: list[tuple[set[int], str]] = []
+    for nums, topic in parts:
+        valid = {x for x in nums if 1 <= x <= n}
+        if valid:
+            groups.append((valid, topic))
+    if len(groups) < 2:
         return [ep]
-    remap = {g: i for i, g in enumerate(used)}
-    current = remap[owner[min(owner)]]
-    groups: list[list[dict]] = [[] for _ in used]
-    for i, m in enumerate(ep.messages, 1):
-        if i in owner:
-            current = remap[owner[i]]
-        groups[current].append(m)
+    covered = set().union(*(g for g, _ in groups))
+    current = 0
+    for i in range(1, n + 1):
+        owners = [k for k, (g, _) in enumerate(groups) if i in g]
+        if owners:
+            current = owners[0]
+        elif covered and i > min(covered):
+            groups[current][0].add(i)
+        else:
+            groups[0][0].add(i)
     out = []
-    for k, msgs in enumerate(groups, 1):
-        sub = Episode(id=f"{ep.id}/{k}", messages=msgs)
+    for k, (nums, topic) in enumerate(groups, 1):
+        msgs = [m for i, m in enumerate(ep.messages, 1) if i in nums]
+        sub = Episode(id=f"{ep.id}/{k}", messages=msgs, focus=topic)
         if any(m.get("reply_to") for m in msgs):
             sub.reply_issue, sub.reply_texts = ep.reply_issue, list(ep.reply_texts)
         out.append(sub)

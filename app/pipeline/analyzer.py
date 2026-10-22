@@ -288,6 +288,7 @@ class Analyzer:
         touched: set[str] = set()
         edited_from: set[str] = set()
         queue: list[tuple[Episode, bool]] = [(ep, True) for ep in ready]
+        claimed: set[str] = set()  # сообщения, уже привязанные к обращению в этом запуске (для деления одного сообщения)
         n = 0
         while queue:
             ep, allow_split = queue.pop(0)
@@ -299,7 +300,8 @@ class Analyzer:
             candidates = self._candidates()
             try:
                 inp = await self._build_input(ep, catalog, candidates)
-                inp.allow_split = allow_split and len(ep.messages) > 1
+                inp.allow_split = allow_split
+                inp.focus = ep.focus
                 self._count_call()
                 res.claude_calls += 1
                 analysis = await self.classifier.classify(inp)
@@ -313,6 +315,7 @@ class Analyzer:
                     log.info("Эпизод %s разделён на %s обращения", ep.id, len(subs))
                     queue[0:0] = [(sub, False) for sub in subs]
                     continue
+            ep.shared = {m["msg_id"] for m in ep.messages} & claimed
             for m in ep.messages:
                 edited_from.update(_PREV_ISSUE_RE.findall(m.get("state_reason", "")))
             chat = self.repo.get("Chats", ep.chat_id) or {}
@@ -322,6 +325,8 @@ class Analyzer:
             res.episodes += 1
             if issue_id:
                 touched.add(issue_id)
+                if outcome != "noise":
+                    claimed.update(m["msg_id"] for m in ep.messages)
             if outcome == "new":
                 res.new_issues += 1
                 res.new_ids.append(issue_id)
