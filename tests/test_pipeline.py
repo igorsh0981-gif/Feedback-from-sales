@@ -217,3 +217,40 @@ async def test_profile_learned_from_messages_without_registration():
     await Analyzer(repo, ScriptedClassifier({**BUG, "title": "Вклад", "app_version": "4.1.0"}), pause_min=10).run()
     assert repo.get("Participants", "u5")["app_version"] == "4.2.0"  # старая версия не затирает новую
     assert repo.get("Issues", "FP-002")["platform"] == "Android"
+
+
+async def test_episode_with_bug_and_wish_split_into_two_issues():
+    repo = await make_repo()
+    add_msg(repo, "После регистрации не подтягиваются карты клиента", author="u1", minutes_ago=30)
+    add_msg(repo, "Скрин ниже", author="u1", minutes_ago=29)
+    add_msg(repo, "Добавьте кнопку Конвертация на главный экран", author="u1", minutes_ago=25)
+    wish = {**BUG, "type": "Пожелание", "priority": "Низкий", "title": "Кнопка Конвертация на главном экране"}
+    clf = ScriptedClassifier({**BUG, "parts": [[1, 2], [3]]}, BUG, wish)
+    res = await Analyzer(repo, clf, pause_min=10).run("test", force=True)
+    assert res.new_issues == 2 and res.claude_calls == 3
+    assert clf.inputs[0].allow_split and not clf.inputs[1].allow_split
+    assert [len(i.messages) for i in clf.inputs[1:]] == [2, 1]
+    assert {i["type"] for i in repo.rows("Issues")} == {"Баг", "Пожелание"}
+    assert repo.get("Issues", "FP-001")["msg_count"] == "2"
+
+
+async def test_split_ignores_single_group():
+    repo = await make_repo()
+    add_msg(repo, "Перевод завис", author="u1", minutes_ago=30)
+    add_msg(repo, "На экране подтверждения", author="u1", minutes_ago=29)
+    clf = ScriptedClassifier({**BUG, "parts": [[1, 2]]})
+    res = await Analyzer(repo, clf, pause_min=10).run("test", force=True)
+    assert res.new_issues == 1 and res.claude_calls == 1
+
+
+async def test_old_service_messages_cleaned_from_issue():
+    repo = await make_repo()
+    svc = add_msg(repo, "", author="u1", kind="other", minutes_ago=31)
+    add_msg(repo, "Перевод завис", author="u1", minutes_ago=30)
+    # как было в старой версии: служебное сообщение попало в обращение
+    await Analyzer(repo, ScriptedClassifier(BUG), pause_min=10).run("test", force=True)
+    repo.update("Messages", svc["msg_id"], {"state": "Учтено", "issue_id": "FP-001", "state_by": "AI"})
+    await Analyzer(repo, ScriptedClassifier(), pause_min=10).run("test")
+    m = repo.get("Messages", svc["msg_id"])
+    assert m["state"] == "Отфильтровано" and not m["issue_id"]
+    assert repo.get("Issues", "FP-001")["msg_count"] == "1"

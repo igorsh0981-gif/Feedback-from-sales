@@ -78,7 +78,9 @@ def detect_noise(text: str, kind: str, has_media: bool, prefs: dict[str, bool]) 
         return Noise("reactions", "Стикер без текста") if prefs.get("reactions", True) else None
     t = _norm(text)
     if not t:
-        return None if kind not in ("text",) else Noise("reactions", "Пустое сообщение")
+        if kind in ("text", "other"):
+            return Noise("reactions", "Служебное или пустое сообщение Telegram (без текста и скриншота)")
+        return None  # файл без подписи — на проверку через анализ
     if has_problem_hint(t):
         return None
     letters = _strip_symbols(t)

@@ -37,3 +37,10 @@ def test_disabled_category_goes_to_analysis():
 
 def test_ambiguous_goes_to_analysis():
     assert cat("А у кого-нибудь ещё так?") is None
+
+
+def test_empty_service_message_filtered():
+    assert detect_noise("", "other", False, ON)
+    assert detect_noise("", "text", False, ON)
+    assert detect_noise("", "document", False, ON) is None  # файл без подписи — в анализ
+    assert detect_noise("", "photo", True, ON) is None

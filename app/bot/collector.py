@@ -69,6 +69,8 @@ class Collector:
             return None  # повторная доставка
         kind = message_kind(message)
         text = message.text or message.caption or ""
+        if kind == "other" and not text:
+            return None  # служебное событие: добавили бота или участника, закрепили сообщение, сменили название и т. п.
         masked = mask_text(text)
         file_id = image_file_id(message)
         album_key = (chat_id, message.media_group_id or "")

@@ -38,6 +38,7 @@ class EpisodeInput:
     chat_platform: str
     messages: list[EpisodeMessage]
     images: list[bytes] = field(default_factory=list)
+    allow_split: bool = True
     context_before: list[str] = field(default_factory=list)
     reply_texts: list[str] = field(default_factory=list)
     reply_issue: str = ""
@@ -66,6 +67,7 @@ class Analysis:
     relation: str = "none"
     confidence: float = 0.0
     reason: str = ""
+    parts: list[list[int]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, d: dict) -> "Analysis":
@@ -96,6 +98,13 @@ class Analysis:
         except (TypeError, ValueError):
             a.confidence = 0.0
         a.reason = str(d.get("reason") or "").strip()[:1500]
+        parts = d.get("parts") or []
+        if isinstance(parts, list):
+            for p in parts[:10]:
+                if isinstance(p, list):
+                    nums = sorted({int(x) for x in p if isinstance(x, (int, float)) or str(x).strip().isdigit()})
+                    if nums:
+                        a.parts.append(nums)
         return a
 
 
@@ -139,7 +148,8 @@ priority:
 - error_text — дословный текст ошибки со скрина или из сообщения, если есть.
 - reason — 1–3 предложения по-русски: почему такой тип, приоритет и совпадение.
 - confidence — уверенность в kind и type от 0 до 1.
-- Контекст беседы до эпизода дан только для понимания; классифицируй сам эпизод."""
+- Контекст беседы до эпизода дан только для понимания; классифицируй сам эпизод.
+- parts — если в эпизоде несколько РАЗНЫХ обращений в разных сообщениях (например, баг и отдельное пожелание), раздели номера сообщений [#N] по обращениям: [[1,2],[3]]. Уточнения и скриншоты относи к тому обращению, к которому они относятся. Если обращение одно — оставь parts пустым. Остальные поля тогда заполни по первой группе."""
 
 TOOL = {
     "name": "submit_analysis",
@@ -166,6 +176,8 @@ TOOL = {
             "relation": {"type": "string", "enum": RELATIONS},
             "confidence": {"type": "number"},
             "reason": {"type": "string"},
+            "parts": {"type": "array", "items": {"type": "array", "items": {"type": "integer"}},
+                      "description": "Группы номеров сообщений, если в эпизоде несколько разных обращений; иначе пусто"},
         },
         "required": ["kind", "type", "section", "priority", "title", "relation", "confidence", "reason"],
     },
@@ -203,13 +215,15 @@ def render_episode(ep: EpisodeInput) -> str:
     if ep.context_before:
         parts.append("Контекст беседы до эпизода (не анализировать):\n" + "\n".join(f"· {t[:300]}" for t in ep.context_before))
     msg_lines = []
-    for m in ep.messages:
+    for n, m in enumerate(ep.messages, 1):
         profile = ", ".join(x for x in [m.platform, m.device, f"версия {m.app_version}" if m.app_version else ""] if x)
-        head = f"[{m.sent_at[11:16]}] {m.author}" + (f" ({profile})" if profile else "")
+        head = f"[#{n}] [{m.sent_at[11:16]}] {m.author}" + (f" ({profile})" if profile else "")
         body = m.text or "(без текста)"
         ocr = "".join(f"\n  Текст со скрина: {o[:600]}" for o in m.screens_ocr if o)
         msg_lines.append(f"{head}: {body}{ocr}")
     parts.append("ЭПИЗОД:\n" + "\n".join(msg_lines))
+    if not ep.allow_split:
+        parts.append("Эпизод уже выделен из более крупного разговора как одно обращение — parts не заполняй.")
     if ep.images:
         parts.append(f"Скриншоты эпизода приложены ниже ({len(ep.images)}).")
     return "\n\n".join(parts)

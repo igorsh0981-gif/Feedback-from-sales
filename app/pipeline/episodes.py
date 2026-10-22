@@ -60,6 +60,34 @@ class _DSU:
             self.p[rb] = ra
 
 
+def split_episode(ep: Episode, parts: list[list[int]]) -> list[Episode]:
+    """Делит эпизод по группам номеров сообщений (1…N) от Claude. Меньше двух непустых групп — без деления.
+    Сообщения вне групп относятся к группе ближайшего предыдущего сообщения."""
+    n = len(ep.messages)
+    owner: dict[int, int] = {}
+    for g, nums in enumerate(parts):
+        for x in nums:
+            if 1 <= x <= n and x not in owner:
+                owner[x] = g
+    used = sorted(set(owner.values()))
+    if len(used) < 2:
+        return [ep]
+    remap = {g: i for i, g in enumerate(used)}
+    current = remap[owner[min(owner)]]
+    groups: list[list[dict]] = [[] for _ in used]
+    for i, m in enumerate(ep.messages, 1):
+        if i in owner:
+            current = remap[owner[i]]
+        groups[current].append(m)
+    out = []
+    for k, msgs in enumerate(groups, 1):
+        sub = Episode(id=f"{ep.id}/{k}", messages=msgs)
+        if any(m.get("reply_to") for m in msgs):
+            sub.reply_issue, sub.reply_texts = ep.reply_issue, list(ep.reply_texts)
+        out.append(sub)
+    return out
+
+
 def build_episodes(
     pending: list[dict],
     all_messages: dict[str, dict],

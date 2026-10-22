@@ -19,7 +19,7 @@ from ..services import audit, recount_issue
 from ..storage.repo import Repo
 from ..util import iso, jloads, now, parse_dt
 from .classifier import EpisodeInput, EpisodeMessage
-from .episodes import Episode, build_episodes
+from .episodes import Episode, build_episodes, split_episode
 from .prefilter import detect_noise
 from .router import apply_analysis, learn_profile
 
@@ -109,6 +109,24 @@ class Analyzer:
             if m.get("state") in LINKED_STATES and m.get("issue_id") and not self.repo.get("Issues", m["issue_id"]):
                 self.repo.update("Messages", m["msg_id"], {"state": MSG_QUEUED, "issue_id": "", "state_reason": "Восстановлено после сбоя записи"})
                 fixed += 1
+        return fixed
+
+    def _cleanup_service(self) -> int:
+        """Служебные события Telegram (добавление бота и т. п.), сохранённые старой версией, — в «Отфильтровано».
+        Решения администратора не трогаем: только записи, которые разметили AI или правила."""
+        fixed = 0
+        for m in self.repo.rows("Messages"):
+            if (m.get("kind") != "other" or m.get("text_masked") or m.get("screens") or m.get("raw_files")
+                    or m.get("state") == MSG_FILTERED or m.get("state_by") not in ("", "AI", "Правила")):
+                continue
+            prev_issue = m.get("issue_id", "")
+            self.repo.update("Messages", m["msg_id"], {
+                "state": MSG_FILTERED, "issue_id": "", "state_by": "Правила", "updated_at": iso(),
+                "state_reason": "Служебное сообщение Telegram (без текста и скриншота)",
+            })
+            if prev_issue:
+                recount_issue(self.repo, prev_issue)
+            fixed += 1
         return fixed
 
     def _prefs(self) -> dict[str, bool]:
@@ -237,6 +255,7 @@ class Analyzer:
 
     async def _run(self, res: RunResult, force: bool) -> None:
         self._recover_orphans()
+        self._cleanup_service()
         prefs = self._prefs()
         pending: list[dict] = []
         for m in self.repo.rows("Messages"):
@@ -268,14 +287,19 @@ class Analyzer:
         catalog = self._catalog()
         touched: set[str] = set()
         edited_from: set[str] = set()
-        for n, ep in enumerate(ready, 1):
+        queue: list[tuple[Episode, bool]] = [(ep, True) for ep in ready]
+        n = 0
+        while queue:
+            ep, allow_split = queue.pop(0)
+            n += 1
             if self._limit_reached():
-                res.skipped_limit = len(ready) - n + 1
+                res.skipped_limit = len(queue) + 1
                 log.warning("Достигнут суточный лимит вызовов Claude; %s эпизодов ждут", res.skipped_limit)
                 break
             candidates = self._candidates()
             try:
                 inp = await self._build_input(ep, catalog, candidates)
+                inp.allow_split = allow_split and len(ep.messages) > 1
                 self._count_call()
                 res.claude_calls += 1
                 analysis = await self.classifier.classify(inp)
@@ -283,6 +307,12 @@ class Analyzer:
                 log.exception("Не удалось разобрать эпизод %s — останется в очереди", ep.id)
                 res.errors += 1
                 continue
+            if inp.allow_split and analysis.parts:
+                subs = split_episode(ep, analysis.parts)
+                if len(subs) > 1:
+                    log.info("Эпизод %s разделён на %s обращения", ep.id, len(subs))
+                    queue[0:0] = [(sub, False) for sub in subs]
+                    continue
             for m in ep.messages:
                 edited_from.update(_PREV_ISSUE_RE.findall(m.get("state_reason", "")))
             chat = self.repo.get("Chats", ep.chat_id) or {}

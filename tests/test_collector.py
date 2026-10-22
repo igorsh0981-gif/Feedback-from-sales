@@ -95,3 +95,15 @@ async def test_edit_requeues_unaccepted_issue():
     after = repo.get("Messages", rec["msg_id"])
     assert after["state"] == "В очереди" and after["issue_id"] == ""
     assert "было в FP-001" in after["state_reason"]
+
+
+async def test_service_message_not_stored():
+    """«Пользователь добавил бота» и прочие служебные события — не обратная связь."""
+    repo = await make_repo()
+    col = Collector(repo, "rus+eng", None, None)
+    data = {"message_id": 50, "date": datetime.now(timezone.utc),
+            "chat": {"id": -1001, "type": "supergroup", "title": "Android · Ташкент"},
+            "from": {"id": 7, "is_bot": False, "first_name": "Игорь"},
+            "new_chat_members": [{"id": 99, "is_bot": True, "first_name": "FeedbackM3_bot"}]}
+    assert col.store_message(Message.model_validate(data)) is None
+    assert not repo.rows("Messages")
