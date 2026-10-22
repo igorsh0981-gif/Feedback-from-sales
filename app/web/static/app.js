@@ -511,7 +511,7 @@ function detailForm(d) {
     <div class="formgrid">${field('Дата устранения', `<input type="date" id="dresolvedAt" ${dis} value="${attr(i.resolved_at)}">`)}${field('Версия исправления', `<input id="dfix" ${dis} value="${attr(i.fix_version)}" placeholder="4.2.1">`)}</div>
     ${field('Результат / что исправлено', `<textarea id="dresolution" rows="2" ${dis} placeholder="Решение и результат проверки">${esc(i.resolution)}</textarea>`, true)}
   </div>
-  <div id="rejectbox" ${i.status === 'Отклонено' ? '' : 'hidden'}>${field('Причина отклонения', `<input id="dreject" ${dis} list="rejectlist" value="${attr(i.reject_reason)}"><datalist id="rejectlist">${o.reject_reasons.map(r => `<option value="${attr(r)}">`).join('')}</datalist>`, true)}</div>
+  <div id="rejectbox" ${i.status === 'Отклонено' ? '' : 'hidden'}>${field('Причина отклонения', `<input id="dreject" ${dis} list="rejectlist" value="${attr(i.reject_reason)}"><datalist id="rejectlist">${o.reject_reasons.map(r => `<option value="${attr(r)}">`).join('')}</datalist>`, true)}${admin && i.status !== 'Отклонено' ? '<button class="danger" onclick="confirmReject()">Отклонить обращение</button>' : ''}</div>
   <div id="answerbox" ${i.status === 'Отвечено' ? '' : 'hidden'}>${field('Ответ участникам', `<textarea id="danswer" rows="2" ${dis}>${esc(i.resolution)}</textarea>`, true)}</div>
   ${field('Комментарий администратора', `<textarea id="dcomment" rows="2" ${dis} placeholder="Основание решения">${esc(i.comment)}</textarea>`, true)}
   <div id="detailerror" class="validation" role="alert"></div>
@@ -606,8 +606,15 @@ async function saveDetail(accept) {
   } catch (e) { box.innerHTML = (e.errors || [e.message]).map(esc).join('<br>'); box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 function quickReject() {
-  $('dstatus').value = 'Отклонено'; syncResolution(); $('dreject').focus();
-  $('detailerror').textContent = 'Укажите причину и нажмите «Сохранить без принятия».';
+  $('dstatus').value = 'Отклонено'; syncResolution();
+  $('rejectbox').scrollIntoView({ behavior: 'smooth', block: 'center' }); $('dreject').focus();
+  $('detailerror').textContent = '';
+}
+async function confirmReject() {
+  if (!$('dreject').value.trim()) { $('detailerror').textContent = 'Выберите или впишите причину отклонения.'; $('dreject').focus(); return; }
+  $('dstatus').value = 'Отклонено'; syncResolution();
+  await saveDetail(false);
+  if (S.detail?.issue?.status === 'Отклонено') toast('Обращение отклонено');
 }
 function showMerge() {
   const d = S.detail;

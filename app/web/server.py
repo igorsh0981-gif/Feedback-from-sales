@@ -715,8 +715,17 @@ async def auth_logout(request: web.Request) -> web.Response:
     return resp
 
 
+@web.middleware
+async def no_stale_static(request: web.Request, handler):
+    """Код дашборда браузер перепроверяет при каждом открытии — иначе после выкладки остаётся старая версия."""
+    resp = await handler(request)
+    if request.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 def create_app(ctx: AppContext) -> web.Application:
-    app = web.Application(middlewares=[view_guard, csrf_guard], client_max_size=2 * 1024 * 1024)
+    app = web.Application(middlewares=[no_stale_static, view_guard, csrf_guard], client_max_size=2 * 1024 * 1024)
     app[CTX] = ctx
     app.router.add_get("/", index)
     app.router.add_get("/health", health)
