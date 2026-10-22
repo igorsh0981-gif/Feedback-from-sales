@@ -38,6 +38,7 @@ function toast(text) { const e = $('toast'); e.textContent = text; e.style.displ
 
 function storedActor() { try { return localStorage.getItem('fp_actor') || ''; } catch { return ''; } }
 S.actor = storedActor();
+const BUILD_ID = document.querySelector('meta[name="fp-build"]')?.content || '';
 async function api(method, path, body) {
   if (method !== 'GET' && S.data?.me?.link && !S.actor && !path.startsWith('/api/auth') && path !== '/api/logout') {
     openNameModal();
@@ -45,11 +46,16 @@ async function api(method, path, body) {
   }
   const res = await fetch(path, {
     method, credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-Actor': encodeURIComponent(S.actor || '') },
+    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'X-Actor': encodeURIComponent(S.actor || ''), 'X-FP-Build': BUILD_ID },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   let data = null;
   try { data = await res.json(); } catch { data = null; }
+  if (res.status === 409 && data?.reload) {
+    // Выложена новая версия: перезагружаемся (не чаще раза в 15 с, чтобы не зациклиться).
+    let last = 0; try { last = +sessionStorage.getItem('fp_reload') || 0; } catch { /* нет хранилища */ }
+    if (Date.now() - last > 15000) { try { sessionStorage.setItem('fp_reload', String(Date.now())); } catch { /* ок */ } location.reload(); }
+  }
   if (!res.ok) {
     const errors = data?.errors || [(res.status === 401 ? 'Войдите как администратор' : `Ошибка ${res.status}`)];
     const err = new Error(errors.join('. '));

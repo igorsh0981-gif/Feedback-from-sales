@@ -724,8 +724,23 @@ async def no_stale_static(request: web.Request, handler):
     return resp
 
 
+STALE_MSG = ("Открыта устаревшая версия дашборда — действия в ней не сохранятся. "
+             "Перезагрузите страницу: Ctrl+Shift+R (на Mac — Cmd+Shift+R).")
+
+
+@web.middleware
+async def stale_client(request: web.Request, handler):
+    """Страница со старым кодом (открыта до выкладки) не работает молча по-старому, а просит перезагрузиться."""
+    ctx = request.app[CTX]
+    if (not ctx.cfg.demo_mode and request.path.startswith("/api/") and not request.path.startswith(("/api/auth", "/api/image"))
+            and request.headers.get("X-FP-Build") != BUILD):
+        return web.json_response({"errors": [STALE_MSG], "reload": True}, status=409)
+    return await handler(request)
+
+
 def create_app(ctx: AppContext) -> web.Application:
-    app = web.Application(middlewares=[no_stale_static, view_guard, csrf_guard], client_max_size=2 * 1024 * 1024)
+    app = web.Application(middlewares=[no_stale_static, view_guard, csrf_guard, stale_client],
+                          client_max_size=2 * 1024 * 1024)
     app[CTX] = ctx
     app.router.add_get("/", index)
     app.router.add_get("/health", health)
