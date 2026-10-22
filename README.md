@@ -96,4 +96,4 @@ DEMO_MODE=1 python -m app.main          # демо на http://localhost:8080, �
 
 ## Обновление на Railway
 
-Сервис на Railway запускается из готового образа `ghcr.io/igorsh0981-gif/feedback-from-sales:latest`: его собирает GitHub Actions при каждом пуше в `main` (`.github/workflows/docker.yml`). После того как сборка в Actions завершилась, нажмите в Railway **Redeploy** у сервиса — он подтянет новый образ.
+Сервис на Railway запускается из готового образа `ghcr.io/igorsh0981-gif/feedback-from-sales:latest`: его собирает GitHub Actions при каждом пуше в `main` (`.github/workflows/docker.yml`). После того как сборка в Actions завершилась, в Railway → сервис → Settings → Source укажите образ с тегом нового коммита (`ghcr.io/igorsh0981-gif/feedback-from-sales:<sha>`) или `:latest` и нажмите Deploy.
