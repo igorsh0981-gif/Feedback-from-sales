@@ -128,3 +128,40 @@ async def test_open_edit_by_link_records_actor(aiohttp_client):
                           headers={**H, "X-Actor": quote("Игорь, PM")})
     assert r.status == 200
     assert any(a["actor"] == "Игорь, PM (по ссылке)" and a["object_id"] == "FP-147" for a in repo.rows("Audit"))
+
+
+async def test_unmerge_restores_issue(aiohttp_client):
+    client, repo = await make_client(aiohttp_client)
+    await login(client)
+    before = repo.get("Issues", "FP-143")["msg_count"]
+    await client.post("/api/issues/FP-151/merge", json={"target": "FP-143"}, headers=H)
+    r = await client.post("/api/issues/FP-143/unlink", json={"other": "FP-151", "relation": "Объединено"}, headers=H)
+    assert r.status == 200, await r.json()
+    assert not repo.get("Issues", "FP-151")["merged_into"]
+    assert repo.get("Issues", "FP-143")["msg_count"] == before
+    body = await r.json()
+    assert not any(x["issue_id"] == "FP-151" for x in body["issue"]["related"])
+    # повторное объединение снова работает
+    r = await client.post("/api/issues/FP-151/merge", json={"target": "FP-143"}, headers=H)
+    assert r.status == 200 and repo.get("Issues", "FP-151")["merged_into"] == "FP-143"
+
+
+async def test_unlink_similar_and_split_message(aiohttp_client):
+    from app.services import link_issues
+    client, repo = await make_client(aiohttp_client)
+    await login(client)
+    link_issues(repo, "FP-147", "FP-142", "Похожее — проверить", "AI")
+    r = await client.post("/api/issues/FP-147/unlink", json={"other": "FP-142", "relation": "Похожее — проверить"}, headers=H)
+    assert r.status == 200
+    assert not any(x["issue_id"] == "FP-142" and x["relation"] == "Похожее — проверить" for x in (await r.json())["issue"]["related"])
+    # выделение сообщения из обращения с несколькими сообщениями
+    iid = next(i["issue_id"] for i in repo.rows("Issues") if int(i["msg_count"] or 0) >= 2 and not i.get("merged_into"))
+    n = int(repo.get("Issues", iid)["msg_count"])
+    msg = next(m for m in repo.rows("Messages") if m.get("issue_id") == iid)
+    r = await client.post(f"/api/messages/{msg['msg_id']}/action", json={"action": "split", "issue_id": iid}, headers=H)
+    new_id = (await r.json())["issue_id"]
+    assert r.status == 200 and new_id and new_id != iid
+    assert repo.get("Messages", msg["msg_id"])["issue_id"] == new_id
+    assert int(repo.get("Issues", iid)["msg_count"]) == n - 1
+    new = repo.get("Issues", new_id)
+    assert new["type"] == repo.get("Issues", iid)["type"] and new["status"] == "Новое"

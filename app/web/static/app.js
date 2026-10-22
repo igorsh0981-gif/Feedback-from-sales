@@ -442,13 +442,31 @@ function authorPanel(d) {
 }
 
 function messagesBlock(d) {
-  return d.messages.map(m => `<div class="quote"><span class="small">${esc(m.author)} · ${showDT(m.sent_at)} · ${esc(m.chat)}${m.edited ? ' · изменено' : ''}</span><p>${esc(m.text || (m.kind === 'photo' ? '(скриншот без подписи)' : '(без текста)'))}</p><span class="small">${m.state === 'Контекст' ? 'Уточнение' : m.reason.startsWith('Старая версия') ? esc(m.reason) : 'Сигнал'}${m.app_version ? ' · версия ' + esc(m.app_version) : ''}${m.mask_summary ? ` · <span class="maskchip" title="Скрыто при обезличивании">скрыто: ${esc(m.mask_summary)}</span>` : ''}${m.link ? ` · <a href="${attr(m.link)}" target="_blank" rel="noopener">в чате ↗</a>` : ''}</span></div>`).join('') || '<div class="quote small">Сообщений нет.</div>';
+  const iid = d.issue.issue_id;
+  const own = d.messages.filter(m => m.issue_id === iid || (m.also || []).includes(iid));
+  const canSplit = isAdmin() && !d.issue.merged_into && own.length > 1;
+  return d.messages.map(m => `<div class="quote"><span class="small">${esc(m.author)} · ${showDT(m.sent_at)} · ${esc(m.chat)}${m.edited ? ' · изменено' : ''}</span><p>${esc(m.text || (m.kind === 'photo' ? '(скриншот без подписи)' : '(без текста)'))}</p><span class="small">${m.state === 'Контекст' ? 'Уточнение' : m.reason.startsWith('Старая версия') ? esc(m.reason) : 'Сигнал'}${m.app_version ? ' · версия ' + esc(m.app_version) : ''}${m.mask_summary ? ` · <span class="maskchip" title="Скрыто при обезличивании">скрыто: ${esc(m.mask_summary)}</span>` : ''}${m.link ? ` · <a href="${attr(m.link)}" target="_blank" rel="noopener">в чате ↗</a>` : ''}</span>${m.issue_id !== iid && !(m.also || []).includes(iid) ? `<div class="small">из объединённого ${esc(m.issue_id)}</div>` : ''}${canSplit && own.includes(m) ? `<div style="margin-top:8px"><button class="linkbtn" onclick="splitMessage('${attr(m.msg_id)}')">Вынести в отдельное обращение</button></div>` : ''}</div>`).join('') || '<div class="quote small">Сообщений нет.</div>';
+}
+async function splitMessage(msgId) {
+  if (!confirm('Вынести это сообщение в новое обращение? Тип, раздел и приоритет скопируются, новое обращение попадёт на утверждение.')) return;
+  try {
+    const r = await api('POST', `/api/messages/${encodeURIComponent(msgId)}/action`, { action: 'split', issue_id: S.detailId });
+    await load(true); toast(`Создано ${r.issue_id}`); openDetail(r.issue_id);
+  } catch (e) { toast(e.message); }
+}
+async function unlinkIssue(other, relation) {
+  const merged = relation === 'Объединено';
+  if (!confirm(merged ? `Разъединить с ${other}? Обращение снова станет самостоятельным со своими сообщениями.` : `Убрать связь «${relation}» с ${other}?`)) return;
+  try {
+    const r = await api('POST', `/api/issues/${encodeURIComponent(S.detailId)}/unlink`, { other, relation });
+    S.detail = r; renderDetail(); await load(true); toast(merged ? 'Обращения разъединены' : 'Связь снята');
+  } catch (e) { toast(e.message); }
 }
 
 function relatedHtml(d) {
   const rel = d.issue.related;
   if (!rel.length) return '';
-  return `<div class="relatedbox"><b>↶ Связанные обращения</b><p class="small">Закрытые обращения не переоткрываются: повтор на версии ≥ исправления — регрессия, на более старой — сигнал «старая версия».</p>${rel.map(r => `<div class="relatedrow"><div><button class="relatedtitle" onclick="openDetail('${attr(r.issue_id)}')">${esc(r.issue_id)} · ${esc(r.title)}</button><p>${esc(r.status)} · выявлено ${showDate(r.created_at)}${r.resolved_at ? ' · устранено ' + showDate(r.resolved_at) : ''}</p>${r.fix_version ? `<p>Версия исправления: <b>${esc(r.fix_version)}</b></p>` : ''}${r.resolution ? `<p>${esc(r.resolution)}</p>` : ''}</div><span class="badge ${r.relation === 'Регрессия' ? 'bug' : r.relation === 'Объединено' ? '' : 'review'}">${esc(r.relation)}${r.direction === 'in' ? ' ←' : ''}</span></div>`).join('')}</div>`;
+  return `<div class="relatedbox"><b>↶ Связанные обращения</b><p class="small">Закрытые обращения не переоткрываются: повтор на версии ≥ исправления — регрессия, на более старой — сигнал «старая версия».</p>${rel.map(r => `<div class="relatedrow"><div><button class="relatedtitle" onclick="openDetail('${attr(r.issue_id)}')">${esc(r.issue_id)} · ${esc(r.title)}</button><p>${esc(r.status)} · выявлено ${showDate(r.created_at)}${r.resolved_at ? ' · устранено ' + showDate(r.resolved_at) : ''}</p>${r.fix_version ? `<p>Версия исправления: <b>${esc(r.fix_version)}</b></p>` : ''}${r.resolution ? `<p>${esc(r.resolution)}</p>` : ''}</div><div style="text-align:right"><span class="badge ${r.relation === 'Регрессия' ? 'bug' : r.relation === 'Объединено' ? '' : 'review'}">${esc(r.relation)}${r.direction === 'in' ? ' ←' : ''}</span>${isAdmin() ? `<div style="margin-top:8px"><button class="linkbtn" onclick="unlinkIssue('${attr(r.issue_id)}','${attr(r.relation)}')">${r.relation === 'Объединено' ? 'Разъединить' : 'Убрать связь'}</button></div>` : ''}</div></div>`).join('')}</div>`;
 }
 
 function aiBlock(i) {
@@ -503,7 +521,7 @@ function renderDetail() {
   <span class="small">${esc(i.issue_id)} · ${esc(i.section)}${i.operation ? ' / ' + esc(i.operation) : ''} · версия ${esc(i.app_version || 'не указана')}</span>
   <h2>${esc(i.title)}</h2>
   <p class="small">Выявлено ${showDT(i.created_at)} · Платформа: <b>${esc(i.platform)}</b>${i.device ? ' · ' + esc(i.device) : ''} · ${i.participant_count} ${plural(i.participant_count, 'участник', 'участника', 'участников')} · ${i.msg_count} ${plural(i.msg_count, 'сообщение', 'сообщения', 'сообщений')}</p>
-  ${badge(i.type)} ${statusBadge(i)} <span class="badge ${i.priority === 'Критичный' ? 'bug' : ''}">${esc(i.priority)}</span>${i.merged_into ? ` <span class="badge">Объединено с ${esc(i.merged_into)}</span>` : ''}
+  ${badge(i.type)} ${statusBadge(i)} <span class="badge ${i.priority === 'Критичный' ? 'bug' : ''}">${esc(i.priority)}</span>${i.merged_into ? ` <span class="badge">Объединено с ${esc(i.merged_into)}</span>${isAdmin() ? ` <button class="linkbtn" onclick="unlinkIssue('${attr(i.merged_into)}','Объединено')">Отменить объединение</button>` : ''}` : ''}
   <div style="margin-top:14px">${sources(i)}</div>
   <div class="detailcols"><div>${authorPanel(d)}<h3 class="subhead">Сообщения</h3>${messagesBlock(d)}<h3 class="subhead">Скриншоты</h3>${screenThumbs(d)}${relatedHtml(d)}</div>
   <div>${aiBlock(i)}${detailForm(d)}${hist ? `<h3 class="subhead">История изменений</h3>${hist}` : ''}</div></div>
@@ -542,7 +560,8 @@ function refreshDue() {
 }
 function onTypeChange() {
   const t = $('dtype').value, cur = $('dstatus').value, list = S.data.options.statuses[t] || [];
-  $('dstatus').innerHTML = opts(list, list.includes(cur) ? cur : 'Новое');
+  const accepted = { 'Баг': 'Принято', 'Пожелание': 'Оценка', 'UX': 'Оценка', 'Вопрос': 'Новое' }[t];
+  $('dstatus').innerHTML = opts(list, list.includes(cur) ? cur : S.detail.issue.accepted_by ? accepted : 'Новое');
   refreshDue();
   syncResolution();
 }

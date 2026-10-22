@@ -214,6 +214,10 @@ def validate_and_save(repo: Repo, issue_id: str, data: dict, actor: str, accept:
     if not new.get("owner"):
         new["owner"] = NO_OWNER
 
+    # Принятое обращение не возвращается в «Новое» при смене типа (иначе выпадает из очереди и висит без статуса).
+    if rec.get("accepted_by") and new.get("status") == "Новое" and t != "Вопрос":
+        new["status"] = ACCEPT_STATUS.get(t, "Новое")
+
     now_iso = iso()
     if accept and not new.get("accepted_by"):
         new["accepted_by"] = actor
@@ -262,8 +266,18 @@ def validate_and_save(repo: Repo, issue_id: str, data: dict, actor: str, accept:
     return repo.get("Issues", issue_id)
 
 
+def active_links(repo: Repo) -> list[dict]:
+    """Связи без снятых администратором."""
+    return [l for l in repo.rows("Links") if not l.get("removed_at")]
+
+
 def link_issues(repo: Repo, issue_id: str, related_id: str, relation: str, actor: str) -> None:
-    if issue_id == related_id or repo.get("Links", issue_id, related_id, relation):
+    if issue_id == related_id:
+        return
+    existing = repo.get("Links", issue_id, related_id, relation)
+    if existing:
+        if existing.get("removed_at"):
+            repo.update("Links", Repo.make_key(issue_id, related_id, relation), {"removed_by": "", "removed_at": ""})
         return
     repo.insert("Links", {"issue_id": issue_id, "related_id": related_id, "relation": relation,
                           "created_by": actor, "created_at": iso()})
@@ -292,6 +306,82 @@ def merge_issues(repo: Repo, source_id: str, target_id: str, actor: str) -> dict
     audit(repo, actor, dst["issue_id"], "Объединение", "", f"добавлено {source_id}")
     recount_issue(repo, dst["issue_id"])
     return repo.get("Issues", dst["issue_id"])
+
+
+def _remove_link(repo: Repo, a: str, b: str, relation: str, actor: str) -> bool:
+    removed = False
+    for x, y in ((a, b), (b, a)):
+        link = repo.get("Links", x, y, relation)
+        if link and not link.get("removed_at"):
+            repo.update("Links", Repo.make_key(x, y, relation), {"removed_by": actor, "removed_at": iso()})
+            removed = True
+    return removed
+
+
+def unmerge_issues(repo: Repo, a: str, b: str, actor: str) -> dict:
+    """Отменяет ошибочное объединение: присоединённое обращение снова самостоятельное, сообщения возвращаются к нему."""
+    ra, rb = repo.get("Issues", a), repo.get("Issues", b)
+    if not ra or not rb:
+        raise ValidationError(["Обращение не найдено"])
+    if ra.get("merged_into") == b:
+        src, dst = ra, rb
+    elif rb.get("merged_into") == a:
+        src, dst = rb, ra
+    else:
+        raise ValidationError([f"{a} и {b} не объединены"])
+    repo.update("Issues", src["issue_id"], {"merged_into": "", "updated_at": iso()})
+    _remove_link(repo, dst["issue_id"], src["issue_id"], REL_MERGED, actor)
+    audit(repo, actor, src["issue_id"], FIELD_NAMES["merged_into"], dst["issue_id"], "")
+    audit(repo, actor, dst["issue_id"], "Разъединение", "", f"выделено {src['issue_id']}")
+    recount_issue(repo, src["issue_id"])
+    recount_issue(repo, dst["issue_id"])
+    return repo.get("Issues", src["issue_id"])
+
+
+def unlink_issues(repo: Repo, a: str, b: str, relation: str, actor: str) -> None:
+    if relation == REL_MERGED:
+        unmerge_issues(repo, a, b, actor)
+        return
+    if not _remove_link(repo, a, b, relation, actor):
+        raise ValidationError(["Связь не найдена"])
+    audit(repo, actor, a, "Связь снята", f"{relation}: {b}", "")
+
+
+def split_message(repo: Repo, msg_id: str, from_issue: str, actor: str) -> dict:
+    """Выносит сообщение из обращения в новое — с теми же типом, разделом и приоритетом, на утверждение."""
+    msg = repo.get("Messages", msg_id)
+    src = repo.get("Issues", from_issue)
+    if not msg or not src:
+        raise ValidationError(["Сообщение или обращение не найдено"])
+    extra = also_issues(msg)
+    if msg.get("issue_id") != from_issue and from_issue not in extra:
+        raise ValidationError([f"Сообщение не относится к {from_issue}"])
+    linked = [m for m in repo.rows("Messages") if message_in_issue(m, from_issue)]
+    if len(linked) < 2:
+        raise ValidationError(["В обращении одно сообщение — выносить нечего"])
+    new_id = repo.next_issue_id()
+    text = msg.get("text_masked", "")
+    repo.insert("Issues", {
+        "issue_id": new_id, "created_at": msg.get("sent_at") or iso(), "updated_at": iso(),
+        "type_ai": "", "type": src.get("type", "Вопрос"), "section": src.get("section", OTHER_SECTION),
+        "operation": src.get("operation", UNKNOWN_OPERATION), "platform": msg.get("platform") or src.get("platform") or NO_PLATFORM,
+        "device": msg.get("device", ""), "app_version": msg.get("app_version", ""), "priority_ai": "",
+        "priority": src.get("priority", "Средний"), "status": "Новое",
+        "title": (text.splitlines() or [""])[0][:80] or f"Выделено из {from_issue}", "summary": text,
+        "reason_ai": f"Администратор выделил сообщение из {from_issue}. Проверьте тип, раздел и заголовок.",
+        "confidence": "", "owner": NO_OWNER,
+    })
+    if msg.get("issue_id") == from_issue:
+        repo.update("Messages", msg_id, {"issue_id": new_id, "state_by": actor, "updated_at": iso(),
+                                         "state_reason": f"Выделено из {from_issue}"})
+    else:
+        repo.update("Messages", msg_id, {"also_issues": ",".join(new_id if x == from_issue else x for x in extra),
+                                         "updated_at": iso()})
+    audit(repo, actor, new_id, "Создано", "", f"выделено из {from_issue} (сообщение {msg_id})")
+    audit(repo, actor, from_issue, "Выделено сообщение", msg_id, new_id)
+    recount_issue(repo, from_issue)
+    recount_issue(repo, new_id)
+    return repo.get("Issues", new_id)
 
 
 # ---------------------------------------------------------------- сообщения

@@ -129,6 +129,16 @@ class Analyzer:
             fixed += 1
         return fixed
 
+    def _repair_accepted_status(self) -> None:
+        """Принятое обращение со статусом «Новое» (после смены типа в старой версии) — в статус принятия."""
+        from ..services import ACCEPT_STATUS
+
+        for r in self.repo.rows("Issues"):
+            if r.get("accepted_by") and r.get("status") == "Новое" and r.get("type") in ("Баг", "Пожелание", "UX"):
+                st = ACCEPT_STATUS[r["type"]]
+                self.repo.update("Issues", r["issue_id"], {"status": st, "updated_at": iso()})
+                audit(self.repo, "Система", r["issue_id"], "Статус", "Новое", st)
+
     def _prefs(self) -> dict[str, bool]:
         return {
             "greetings": self.repo.setting_on("filter_greetings"),
@@ -256,6 +266,7 @@ class Analyzer:
     async def _run(self, res: RunResult, force: bool) -> None:
         self._recover_orphans()
         self._cleanup_service()
+        self._repair_accepted_status()
         prefs = self._prefs()
         pending: list[dict] = []
         for m in self.repo.rows("Messages"):

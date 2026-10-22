@@ -33,6 +33,7 @@ from ..pipeline.jira_text import build_jira_text
 from ..services import (
     FIELD_NAMES,
     ValidationError,
+    active_links,
     also_issues,
     audit,
     audit_changes,
@@ -41,6 +42,8 @@ from ..services import (
     is_overdue,
     merge_issues,
     message_action,
+    split_message,
+    unlink_issues,
     validate_and_save,
 )
 from ..storage.repo import Repo
@@ -191,7 +194,7 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
     titles = _chat_titles(repo)
     people = _participants(repo)
     by_issue = _messages_by_issue(repo)
-    links = repo.rows("Links")
+    links = active_links(repo)
     issues = [issue_view(repo, r, by_issue.get(r["issue_id"], []), titles, people, links) for r in repo.rows("Issues")]
     cutoff = iso(now() - timedelta(days=30))
     msgs = [message_view(m, titles) for m in repo.rows("Messages")
@@ -360,7 +363,7 @@ def issue_detail(ctx: AppContext, rec: dict) -> dict:
     titles = _chat_titles(repo)
     by_issue = _messages_by_issue(repo)
     msgs = by_issue.get(rec["issue_id"], [])
-    view = issue_view(repo, rec, msgs, titles, _participants(repo), repo.rows("Links"))
+    view = issue_view(repo, rec, msgs, titles, _participants(repo), active_links(repo))
     hist = [a for a in repo.rows("Audit") if a.get("object_id") == rec["issue_id"]][::-1]
     base = (parse_dt(rec.get("accepted_at", "")) or now()).date()
     return {
@@ -399,6 +402,20 @@ async def api_issue_merge(request: web.Request) -> web.Response:
         return _json_error(exc.errors)
     await ctx.repo.commit()
     return web.json_response({"ok": True, **issue_detail(ctx, rec)})
+
+
+async def api_issue_unlink(request: web.Request) -> web.Response:
+    """Снять ошибочную связь или разъединить объединённые обращения."""
+    admin = require_admin(request)
+    ctx = request.app[CTX]
+    data = await _body(request)
+    iid = request.match_info["issue_id"]
+    try:
+        unlink_issues(ctx.repo, iid, str(data.get("other", "")), str(data.get("relation", "")), _actor(admin))
+    except ValidationError as exc:
+        return _json_error(exc.errors)
+    await ctx.repo.commit()
+    return web.json_response({"ok": True, **issue_detail(ctx, ctx.repo.get("Issues", iid))})
 
 
 async def api_jira_get(request: web.Request) -> web.Response:
@@ -440,8 +457,11 @@ async def api_message_action(request: web.Request) -> web.Response:
     ctx = request.app[CTX]
     data = await _body(request)
     try:
-        result = message_action(ctx.repo, request.match_info["msg_id"], str(data.get("action", "")), _actor(admin),
-                                str(data.get("reason", "")), str(data.get("issue_id", "")))
+        if data.get("action") == "split":
+            result = split_message(ctx.repo, request.match_info["msg_id"], str(data.get("issue_id", "")), _actor(admin))
+        else:
+            result = message_action(ctx.repo, request.match_info["msg_id"], str(data.get("action", "")), _actor(admin),
+                                    str(data.get("reason", "")), str(data.get("issue_id", "")))
     except ValidationError as exc:
         return _json_error(exc.errors)
     await ctx.repo.commit()
@@ -687,6 +707,7 @@ def create_app(ctx: AppContext) -> web.Application:
     app.router.add_get("/api/issues/{issue_id}", api_issue)
     app.router.add_post("/api/issues/{issue_id}/save", api_issue_save)
     app.router.add_post("/api/issues/{issue_id}/merge", api_issue_merge)
+    app.router.add_post("/api/issues/{issue_id}/unlink", api_issue_unlink)
     app.router.add_get("/api/issues/{issue_id}/jira", api_jira_get)
     app.router.add_post("/api/issues/{issue_id}/jira", api_jira_save)
     app.router.add_post("/api/messages/{msg_id}/action", api_message_action)

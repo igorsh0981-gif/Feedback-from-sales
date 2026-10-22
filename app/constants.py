@@ -122,7 +122,7 @@ SCHEMA: dict[str, dict] = {
     },
     "Links": {
         "key": ["issue_id", "related_id", "relation"],
-        "cols": ["issue_id", "related_id", "relation", "created_by", "created_at"],
+        "cols": ["issue_id", "related_id", "relation", "created_by", "created_at", "removed_by", "removed_at"],
     },
     "Audit": {"key": None, "cols": ["ts", "actor", "object_id", "field", "old", "new"]},
     "Runs": {

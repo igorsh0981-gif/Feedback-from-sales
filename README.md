@@ -81,7 +81,7 @@
 
 ```bash
 pip install -r requirements-dev.txt     # нужен tesseract с языками rus, uzb, uzb_cyrl
-pytest                                  # 68 тестов
+pytest                                  # 70 тестов
 DEMO_MODE=1 python -m app.main          # демо на http://localhost:8080, вход — /auth/demo
 ```
 

@@ -23,6 +23,8 @@ def _plural(n: int, one: str, few: str, many: str) -> str:
 def related_lines(repo: Repo, issue: dict) -> list[str]:
     out = []
     for link in repo.rows("Links"):
+        if link.get("removed_at"):
+            continue
         if link["relation"] == REL_MERGED:
             continue
         other_id = link["related_id"] if link["issue_id"] == issue["issue_id"] else (
