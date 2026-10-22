@@ -114,8 +114,21 @@ function renderFrame() {
     : me.admin
     ? `<span class="avatar">${esc(initials(me.name))}</span><b>${esc(me.name)}</b><p class="small">Администратор · <button class="linkbtn" onclick="logout()">Выйти</button></p>`
     : `<span class="avatar">👁</span><b>Наблюдатель</b><p class="small">Только просмотр · <button class="linkbtn" onclick="openLogin()">Войти</button></p>`}`;
-  $('topright').innerHTML = `<span class="demo">${m.demo ? 'ДЕМО' : 'FOCUS PULSE'}</span><span class="small">${showDate(m.now)}</span><span class="avatar">${me.admin ? esc(initials(me.name)) : '👁'}</span>`;
+  // Меню пользователя в шапке — выход доступен на любом размере экрана, даже если боковая панель не помещается.
+  const who = me.link ? (S.actor || 'Гость') : me.admin ? me.name : 'Наблюдатель';
+  const role = me.link ? 'Редактирование по ссылке' : me.admin ? 'Администратор' : 'Только просмотр';
+  const action = me.link ? `<button onclick="toggleUserMenu(false);openNameModal()">${S.actor ? 'Сменить имя' : 'Представиться'}</button>`
+    : me.admin ? '<button onclick="toggleUserMenu(false);logout()">Выйти</button>'
+    : '<button onclick="toggleUserMenu(false);openLogin()">Войти</button>';
+  $('topright').innerHTML = `<span class="demo">${m.demo ? 'ДЕМО' : 'FOCUS PULSE'}</span><span class="small">${showDate(m.now)}</span>
+    <div class="usermenu"><button class="avatar avatarbtn" aria-haspopup="true" aria-label="Меню пользователя" onclick="toggleUserMenu()">${me.admin ? esc(initials(who)) : '👁'}</button>
+    <div class="userpop" id="userpop" hidden><b>${esc(who)}</b><span class="small">${role}</span>${action}</div></div>`;
 }
+function toggleUserMenu(show) {
+  const pop = $('userpop'); if (!pop) return;
+  pop.hidden = show === undefined ? !pop.hidden : !show;
+}
+document.addEventListener('click', e => { if (!e.target.closest?.('.usermenu')) toggleUserMenu(false); });
 
 const SUBTITLES = {
   'Обзор': 'От сообщений в чатах — к понятным решениям по продукту.',
