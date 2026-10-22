@@ -727,12 +727,29 @@ function toggle(key, label, hint) {
   const on = S.data.settings[key] === '1';
   return `<div class="settingrow"><div><b>${label}</b><p>${hint}</p></div>${isAdmin() ? `<label class="checklabel"><input type="checkbox" ${on ? 'checked' : ''} onchange="saveSetting('${key}',this.checked)" aria-label="${label}"> ${on ? 'Включено' : 'Выключено'}</label>` : `<span class="badge ${on ? 'approved' : ''}">${on ? 'Включено' : 'Выключено'}</span>`}</div>`;
 }
+// Ссылка для участников — только владельцу (вход через бота).
+function shareUrl() { const s = S.data.me.share; return s ? (s.base || location.origin) + s.path : ''; }
+function shareBlock() {
+  const s = S.data.me.share;
+  if (!s) return '';
+  const mode = s.edit ? 'По этой ссылке можно не только смотреть, но и менять обращения (имя пишется в журнал).'
+    : 'По этой ссылке — только просмотр. Изменения — у админов через /login в боте.';
+  return `<section class="panel settings" style="margin-bottom:20px"><h2>Ссылка на дашборд для участников</h2>
+  <p class="small">Видна только вам. Отправьте её участникам — браузер запомнит доступ на 90 дней. ${mode}${s.protected ? ' Чтобы старая ссылка перестала работать, смените VIEW_TOKEN в Railway.' : ' Внимание: VIEW_TOKEN не задан — дашборд открыт всем, кто знает адрес.'}</p>
+  <div class="sharerow"><input id="shareurl" readonly value="${attr(shareUrl())}" onclick="this.select()"><button class="primary" onclick="copyShare()">Скопировать</button></div></section>`;
+}
+async function copyShare() {
+  const url = shareUrl();
+  try { await navigator.clipboard.writeText(url); }
+  catch { const el = $('shareurl'); el.select(); try { document.execCommand('copy'); } catch { /* выделено — можно скопировать вручную */ } }
+  toast('Ссылка скопирована');
+}
 function settingsPage() {
   const m = S.data.meta, admin = isAdmin(), o = S.data.options;
   const opsRows = [...S.data.operations].sort((a, b) => (a.status === 'Предложена' ? 0 : 1) - (b.status === 'Предложена' ? 0 : 1) || a.section.localeCompare(b.section) || a.operation.localeCompare(b.operation));
   const h = m.health || {};
   S.opsRows = opsRows;
-  return `<section class="panel settings"><h2>Анализ и фильтрация</h2>
+  return `${shareBlock()}<section class="panel settings"><h2>Анализ и фильтрация</h2>
   ${toggle('auto_analysis', `Автоанализ каждые ${m.interval_min} минут`, `Эпизод разбирается, когда в нём нет новых сообщений ${m.pause_min} минут. Кнопка «Запустить анализ» разбирает всё сразу.`)}
   ${toggle('filter_greetings', 'Фильтровать приветствия', 'Исключаются из реестра без AI, сохраняются в «Фильтрации чата».')}
   ${toggle('filter_organization', 'Фильтровать организационную переписку', 'Созвоны, встречи, время — без признаков проблемы.')}

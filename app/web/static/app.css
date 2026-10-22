@@ -40,3 +40,4 @@ td.titlecell{white-space:normal}
 
 .filterchips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}.filterchips .chip{font-size:11px;padding:5px 9px;background:#eef3e7;border-color:#cfdcc4}.filterchips .chip:hover{background:#e2ebd8}.filterchips .linkbtn{font-size:11px}.hiddencount{font-size:11px;color:#987333;background:#faf1da;padding:5px 9px;border-radius:5px;margin-left:auto}
 .danger{background:#b54736;color:#fff;border-color:#b54736}.danger:hover{background:#963726}
+.sharerow{display:flex;gap:10px;align-items:center;margin-top:12px}.sharerow input{flex:1;min-width:0;font-family:ui-monospace,monospace;font-size:12px;background:#f7f8f5}

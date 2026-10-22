@@ -202,6 +202,23 @@ def issue_view(repo: Repo, rec: dict, msgs: list[dict], titles: dict[str, str], 
     return view
 
 
+def is_owner(ctx: AppContext, admin: dict | None) -> bool:
+    """Владелец — админ из ADMIN_IDS, вошедший через бота (/login или Telegram). Вход по общей ссылке не считается."""
+    if not admin or admin.get("link"):
+        return False
+    uid = admin.get("uid")
+    return (isinstance(uid, int) and uid in ctx.cfg.admin_ids) or (ctx.cfg.demo_mode and uid == -1)
+
+
+def share_link(ctx: AppContext, admin: dict | None) -> dict | None:
+    """Ссылка на дашборд для рассылки участникам — видна только владельцу."""
+    if not is_owner(ctx, admin):
+        return None
+    query = f"/?k={ctx.cfg.view_token}" if ctx.cfg.view_token else "/"
+    return {"base": ctx.cfg.dashboard_url, "path": query, "edit": ctx.cfg.open_edit,
+            "protected": bool(ctx.cfg.view_token)}
+
+
 def state_payload(ctx: AppContext, admin: dict | None) -> dict:
     repo = ctx.repo
     titles = _chat_titles(repo)
@@ -240,7 +257,7 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
                     "review": to_int(r.get("review")), "errors": to_int(r.get("errors")), "waiting": 0}
     return {
         "me": {"admin": bool(admin), "name": (admin or {}).get("name", ""), "uid": (admin or {}).get("uid"),
-               "link": bool((admin or {}).get("link"))},
+               "link": bool((admin or {}).get("link")), "share": share_link(ctx, admin)},
         "meta": {
             "build": BUILD,
             "demo": ctx.cfg.demo_mode, "bot_username": ctx.bot_username, "classifier": ctx.classifier_name,

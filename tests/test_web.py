@@ -165,3 +165,13 @@ async def test_unlink_similar_and_split_message(aiohttp_client):
     assert int(repo.get("Issues", iid)["msg_count"]) == n - 1
     new = repo.get("Issues", new_id)
     assert new["type"] == repo.get("Issues", iid)["type"] and new["status"] == "Новое"
+
+
+async def test_share_link_only_for_owner(aiohttp_client):
+    client, _ = await make_client(aiohttp_client, view_token="abc", open_edit=True)
+    await client.get("/?k=abc", allow_redirects=False)
+    state = await (await client.get("/api/state")).json()
+    assert state["me"]["admin"] and state["me"]["share"] is None  # по общей ссылке — не видно
+    await login(client)
+    share = (await (await client.get("/api/state")).json())["me"]["share"]
+    assert share["path"] == "/?k=abc" and share["edit"] is True
