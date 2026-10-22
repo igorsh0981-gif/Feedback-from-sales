@@ -175,3 +175,29 @@ async def test_share_link_only_for_owner(aiohttp_client):
     await login(client)
     share = (await (await client.get("/api/state")).json())["me"]["share"]
     assert share["path"] == "/?k=abc" and share["edit"] is True
+
+
+async def test_release_edit_and_delete(aiohttp_client):
+    client, repo = await make_client(aiohttp_client)
+    await login(client)
+    r = await client.post("/api/releases", json={"version": "2.8.0", "platform": "iOS и Android", "released_at": "2026-10-22"}, headers=H)
+    assert r.status == 200
+    # только дата
+    r = await client.post("/api/releases/edit", json={"old_version": "2.8.0", "old_platform": "iOS и Android",
+                          "version": "2.8.0", "platform": "iOS и Android", "released_at": "2026-10-30"}, headers=H)
+    assert r.status == 200 and repo.get("Releases", "2.8.0", "iOS и Android")["released_at"] == "2026-10-30"
+    # версия и платформа (ключ строки)
+    r = await client.post("/api/releases/edit", json={"old_version": "2.8.0", "old_platform": "iOS и Android",
+                          "version": "4.3.0", "platform": "Android", "released_at": "2026-10-30"}, headers=H)
+    assert r.status == 200
+    assert repo.get("Releases", "2.8.0", "iOS и Android") is None and repo.get("Releases", "4.3.0", "Android")
+    assert sum(1 for row in repo.backend.sheets["Releases"][1:] if row[0] == "2.8.0") == 0
+    # конфликт с существующим релизом и неверная версия
+    r = await client.post("/api/releases/edit", json={"old_version": "4.3.0", "old_platform": "Android",
+                          "version": "4.2.0", "platform": "iOS и Android", "released_at": "2026-10-30"}, headers=H)
+    assert r.status == 422
+    r = await client.post("/api/releases/edit", json={"old_version": "4.3.0", "old_platform": "Android",
+                          "version": "abc", "platform": "Android", "released_at": "2026-10-30"}, headers=H)
+    assert r.status == 422
+    r = await client.post("/api/releases/delete", json={"version": "4.3.0", "platform": "Android"}, headers=H)
+    assert r.status == 200 and repo.get("Releases", "4.3.0", "Android") is None

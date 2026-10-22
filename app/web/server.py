@@ -47,7 +47,7 @@ from ..services import (
     validate_and_save,
 )
 from ..storage.repo import Repo
-from ..util import iso, jloads, join_list, now, parse_dt, parse_version, split_list, to_float, to_int
+from ..util import iso, jloads, join_list, now, parse_date, parse_dt, parse_version, split_list, to_float, to_int
 from .auth import SESSION_COOKIE, VIEW_COOKIE, read_session, sign_session, verify_telegram_login, view_cookie_value
 
 log = logging.getLogger(__name__)
@@ -577,10 +577,7 @@ def rec_key(*parts: str) -> str:
     return Repo.make_key(*parts)
 
 
-async def api_release(request: web.Request) -> web.Response:
-    admin = require_admin(request)
-    ctx = request.app[CTX]
-    data = await _body(request)
+def _release_fields(data: dict) -> tuple[str, str, str, list[str]]:
     version = str(data.get("version", "")).strip()
     platform = str(data.get("platform", "")).strip()
     released = str(data.get("released_at", "")).strip()[:10]
@@ -589,8 +586,60 @@ async def api_release(request: web.Request) -> web.Response:
         errors.append("Укажите версию в формате 4.2.1")
     if platform not in ("iOS", "Android", "iOS и Android"):
         errors.append("Выберите платформу")
-    if not released:
+    if not parse_date(released):
         errors.append("Укажите дату выхода")
+    return version, platform, released, errors
+
+
+async def api_release_edit(request: web.Request) -> web.Response:
+    """Правка релиза. Версия и платформа — ключ строки, поэтому при их смене строка заменяется."""
+    admin = require_admin(request)
+    ctx, repo = request.app[CTX], request.app[CTX].repo
+    data = await _body(request)
+    old_v, old_p = str(data.get("old_version", "")).strip(), str(data.get("old_platform", "")).strip()
+    old = repo.get("Releases", old_v, old_p)
+    if not old:
+        return _json_error(["Релиз не найден — обновите страницу"])
+    version, platform, released, errors = _release_fields(data)
+    if errors:
+        return _json_error(errors)
+    actor = _actor(admin)
+    if (version, platform) == (old_v, old_p):
+        if released != old.get("released_at"):
+            repo.update("Releases", rec_key(version, platform), {"released_at": released})
+            audit(repo, actor, f"Релиз {version}", "Дата выхода", old.get("released_at", ""), released)
+            await repo.commit()
+        return web.json_response({"ok": True})
+    if repo.get("Releases", version, platform):
+        return _json_error([f"Релиз {version} · {platform} уже заведён"])
+    created_by = old.get("created_by", "")
+    await repo.delete_where({"Releases": lambda r: r.get("version", "").strip() == old_v and r.get("platform", "").strip() == old_p})
+    repo.insert("Releases", {"version": version, "platform": platform, "released_at": released, "created_by": created_by})
+    audit(repo, actor, f"Релиз {version}", "Релиз изменён", f"{old_v} · {old_p} · {old.get('released_at', '')}",
+          f"{version} · {platform} · {released}")
+    await repo.commit()
+    return web.json_response({"ok": True})
+
+
+async def api_release_delete(request: web.Request) -> web.Response:
+    admin = require_admin(request)
+    repo = request.app[CTX].repo
+    data = await _body(request)
+    v, p = str(data.get("version", "")).strip(), str(data.get("platform", "")).strip()
+    old = repo.get("Releases", v, p)
+    if not old:
+        return _json_error(["Релиз не найден — обновите страницу"])
+    await repo.delete_where({"Releases": lambda r: r.get("version", "").strip() == v and r.get("platform", "").strip() == p})
+    audit(repo, _actor(admin), f"Релиз {v}", "Релиз удалён", f"{p} · {old.get('released_at', '')}", "")
+    await repo.commit()
+    return web.json_response({"ok": True})
+
+
+async def api_release(request: web.Request) -> web.Response:
+    admin = require_admin(request)
+    ctx = request.app[CTX]
+    data = await _body(request)
+    version, platform, released, errors = _release_fields(data)
     if errors:
         return _json_error(errors)
     if ctx.repo.get("Releases", version, platform):
@@ -772,6 +821,8 @@ def create_app(ctx: AppContext) -> web.Application:
     app.router.add_post("/api/chats/{chat_id}", api_chat)
     app.router.add_post("/api/operations", api_operations)
     app.router.add_post("/api/releases", api_release)
+    app.router.add_post("/api/releases/edit", api_release_edit)
+    app.router.add_post("/api/releases/delete", api_release_delete)
     app.router.add_post("/api/settings", api_settings)
     app.router.add_post("/api/run", api_run)
     app.router.add_post("/api/reload", api_reload)

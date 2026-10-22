@@ -778,7 +778,9 @@ function settingsPage() {
   ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Раздел<select id="newopSection">${opts(o.sections)}</select></label><label>Операция<input id="newopName" placeholder="Например: Оплата штрафов"></label><button onclick="opAdd()">Добавить операцию</button></div>` : ''}</section>
 
   <section class="panel settings" style="margin-top:20px"><h2>Релизы</h2><p class="small">Нужны для срока «до ближайшего релиза» и для логики регрессий. Версию участника бот берёт из его сообщений; можно также написать в личку тем, кто запускал бота.</p>
-  ${S.data.releases.map(r => `<div class="settingrow"><div><b>${esc(r.version)}</b> · ${esc(r.platform)}<p>Выход: ${showDate(r.released_at)} · завёл ${esc(r.created_by)}</p></div></div>`).join('') || '<p class="small">Релизов пока нет.</p>'}
+  ${S.data.releases.map((r, k) => S.editRelease === k && admin
+    ? `<div class="settingrow"><div class="periodrow"><label>Версия<input id="erVersion" value="${attr(r.version)}"></label><label>Платформа<select id="erPlatform">${opts(['iOS и Android', 'iOS', 'Android'], r.platform)}</select></label><label>Дата выхода<input id="erDate" type="date" value="${attr(r.released_at.slice(0, 10))}"></label><button class="primary" onclick="saveRelease(${k})">Сохранить</button><button onclick="S.editRelease=null;render()">Отмена</button></div></div>`
+    : `<div class="settingrow"><div><b>${esc(r.version)}</b> · ${esc(r.platform)}<p>Выход: ${showDate(r.released_at)} · завёл ${esc(r.created_by)}</p></div>${admin ? `<div class="mini-actions"><button onclick="S.editRelease=${k};render()">Изменить</button><button onclick="deleteRelease(${k})">Удалить</button></div>` : ''}</div>`).join('') || '<p class="small">Релизов пока нет.</p>'}
   ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Версия<input id="relVersion" placeholder="4.2.1"></label><label>Платформа<select id="relPlatform">${opts(['iOS и Android', 'iOS', 'Android'])}</select></label><label>Дата выхода<input id="relDate" type="date" value="${today()}"></label><label class="checklabel"><input type="checkbox" id="relNotify"> Написать в личку участникам, которые запускали бота</label><button onclick="addRelease()">Завести релиз</button></div>` : ''}</section>
 
   <section class="panel settings" style="margin-top:20px"><h2>Интеграции и доступ</h2>
@@ -798,6 +800,19 @@ async function addRelease() {
     const r = await api('POST', '/api/releases', { version: $('relVersion').value.trim(), platform: $('relPlatform').value, released_at: $('relDate').value, notify: $('relNotify').checked });
     await load(true); toast(r.notified ? `Релиз заведён, сообщения отправлены: ${r.notified}` : 'Релиз заведён');
   } catch (e) { toast(e.message); }
+}
+async function saveRelease(k) {
+  const r = S.data.releases[k];
+  try {
+    await api('POST', '/api/releases/edit', { old_version: r.version, old_platform: r.platform, version: $('erVersion').value.trim(), platform: $('erPlatform').value, released_at: $('erDate').value });
+    S.editRelease = null; await load(true); toast('Релиз сохранён');
+  } catch (e) { toast(e.message); }
+}
+async function deleteRelease(k) {
+  const r = S.data.releases[k];
+  if (!confirm(`Удалить релиз ${r.version} · ${r.platform}? Сроки «до ближайшего релиза» пересчитаются по оставшимся релизам.`)) return;
+  try { await api('POST', '/api/releases/delete', { version: r.version, platform: r.platform }); S.editRelease = null; await load(true); toast('Релиз удалён'); }
+  catch (e) { toast(e.message); }
 }
 async function reloadSheets() { try { await api('POST', '/api/reload', {}); await load(true); toast('Данные перечитаны из таблицы'); } catch (e) { toast(e.message); } }
 
