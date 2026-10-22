@@ -44,7 +44,7 @@ from ..services import (
     validate_and_save,
 )
 from ..storage.repo import Repo
-from ..util import iso, jloads, now, parse_dt, parse_version, split_list, to_float, to_int
+from ..util import iso, jloads, join_list, now, parse_dt, parse_version, split_list, to_float, to_int
 from .auth import SESSION_COOKIE, VIEW_COOKIE, read_session, sign_session, verify_telegram_login, view_cookie_value
 
 log = logging.getLogger(__name__)
@@ -172,7 +172,8 @@ def issue_view(repo: Repo, rec: dict, msgs: list[dict], titles: dict[str, str], 
         "confidence": to_float(rec.get("confidence"), 0.0),
         "msg_count": to_int(rec.get("msg_count")),
         "participant_count": to_int(rec.get("participant_count")),
-        "chats": split_list(rec.get("chats", "")),
+        # Источник — по фактически привязанным сообщениям; сохранённое поле — запасной вариант.
+        "chats": split_list(join_list(m.get("chat_id", "") for m in msgs)) if msgs else split_list(rec.get("chats", "")),
         "review": in_review(rec),
         "overdue": is_overdue(rec),
         "reporters": reporters,

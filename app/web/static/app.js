@@ -431,7 +431,6 @@ function detailForm(d) {
   if (i.operation && !ops.includes(i.operation)) ops.unshift(i.operation);
   const statuses = o.statuses[i.type] || [];
   const isBug = i.type === 'Баг';
-  const due = i.due || (admin && i.review && isBug ? d.suggested_due : '');
   return `<div class="formgrid">
     ${field('Тип обращения', `<select id="dtype" ${dis} onchange="onTypeChange()">${opts(o.types, i.type)}</select>`)}
     ${field('Приоритет', `<select id="dpriority" ${dis} onchange="onPriorityChange()">${opts(o.priorities, i.priority)}</select>`)}
@@ -442,9 +441,9 @@ function detailForm(d) {
     ${field('Платформа', `<select id="dplatform" ${dis}>${opts(o.platforms, i.platform)}</select>`)}
     ${field('Версия приложения', `<input id="dversion" ${dis} value="${attr(i.app_version)}" placeholder="4.2.0">`)}
     ${field('Устройство', `<input id="ddevice" ${dis} value="${attr(i.device)}" placeholder="Samsung A54">`)}
-    ${field(isBug ? 'Срок устранения' : 'Целевой релиз', isBug ? `<input id="ddue" type="date" ${dis} value="${attr(due)}">` : `<input id="dfixplan" ${dis} value="${attr(i.fix_version)}" placeholder="4.3.0">`)}
+    ${dueField(isBug, i.priority)}
   </div>
-  ${isBug ? `<div class="sugg small" id="duehint">${d.suggested_due ? `По приоритету: ${showDate(d.suggested_due)}${admin ? ` <button class="linkbtn" onclick="$('ddue').value='${d.suggested_due}'">подставить</button>` : ''}` : i.priority === 'Низкий' ? 'Низкий приоритет — без срока' : 'Средний приоритет — срок по дате ближайшего релиза (заведите релиз в настройках)'}${i.due_set_by ? ` · срок поставил: ${esc(i.due_set_by)}` : ''}</div>${deadline(i)}` : ''}
+  <div id="duehintbox">${isBug ? dueHint(i.priority) + deadline(i) : ''}</div>
   ${field('Заголовок', `<input id="dtitle" ${dis} value="${attr(i.title)}" maxlength="120">`, true)}
   <div class="resolved-controls" id="resolvedbox" ${RESOLVED.includes(i.status) ? '' : 'hidden'}>
     <div class="formgrid">${field('Дата устранения', `<input type="date" id="dresolvedAt" ${dis} value="${attr(i.resolved_at)}">`)}${field('Версия исправления', `<input id="dfix" ${dis} value="${attr(i.fix_version)}" placeholder="4.2.1">`)}</div>
@@ -472,9 +471,40 @@ function renderDetail() {
   ${admin && !i.merged_into ? `<div class="detailfooter">${i.review ? `<button class="primary" onclick="saveDetail(true)">Принять и распределить</button><button onclick="saveDetail(false)">Сохранить без принятия</button><button onclick="quickReject()">Отклонить…</button>` : '<button class="primary" onclick="saveDetail(false)">Сохранить</button>'}${!TERMINAL.includes(i.status) && d.merge_targets.length ? '<button onclick="showMerge()">Объединить…</button>' : ''}</div><div id="mergebox"></div>` : admin ? '' : '<p class="small" style="margin-top:20px">Изменять обращения могут только администраторы. <button class="linkbtn" onclick="openLogin()">Войти</button></p>'}`;
 }
 
+// Срок для бага / целевой релиз для остальных — перерисовываются при смене типа и приоритета в форме.
+function suggestedDue(priority) {
+  const d = S.detail, i = d.issue;
+  if (priority === 'Критичный' || priority === 'Высокий') {
+    let left = priority === 'Критичный' ? 1 : 3; const x = new Date();
+    while (left > 0) { x.setDate(x.getDate() + 1); if (x.getDay() !== 0 && x.getDay() !== 6) left--; }
+    return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+  }
+  return priority === 'Средний' && i.priority === 'Средний' ? (d.suggested_due || '') : '';
+}
+function dueField(isBug, priority, keepInput = false) {
+  const i = S.detail.issue, admin = isAdmin(), dis = admin ? '' : 'disabled';
+  if (!isBug) return `<label class="field" id="duefield">Целевой релиз<input id="dfixplan" ${dis} value="${attr(i.fix_version)}" placeholder="4.3.0"></label>`;
+  const keep = keepInput && $('ddue') && !$('ddue').dataset.auto ? $('ddue').value : '';
+  const auto = !keep && !i.due && admin && i.review ? suggestedDue(priority) : '';
+  const due = keep || i.due || auto;
+  return `<label class="field" id="duefield">Срок устранения<input id="ddue" type="date" ${dis} value="${attr(due)}"${auto ? ' data-auto="1"' : ''} oninput="delete this.dataset.auto"></label>`;
+}
+function dueHint(priority) {
+  const i = S.detail.issue, sug = suggestedDue(priority);
+  const text = sug ? `По приоритету «${esc(priority)}»: ${showDate(sug)}${isAdmin() ? ` <button class="linkbtn" onclick="$('ddue').value='${sug}'">подставить</button>` : ''}`
+    : priority === 'Низкий' ? 'Низкий приоритет — срок можно не ставить'
+    : 'Средний приоритет — срок по дате ближайшего релиза (заведите релиз в настройках) или выберите дату в календаре';
+  return `<div class="sugg small" id="duehint">${text}${i.due_set_by ? ` · срок поставил: ${esc(i.due_set_by)}` : ''}</div>`;
+}
+function refreshDue() {
+  const isBug = $('dtype').value === 'Баг', pr = $('dpriority').value;
+  $('duefield').outerHTML = dueField(isBug, pr, true);
+  $('duehintbox').innerHTML = isBug ? dueHint(pr) + deadline(S.detail.issue) : '';
+}
 function onTypeChange() {
   const t = $('dtype').value, cur = $('dstatus').value, list = S.data.options.statuses[t] || [];
   $('dstatus').innerHTML = opts(list, list.includes(cur) ? cur : 'Новое');
+  refreshDue();
   syncResolution();
 }
 function onSectionChange() {
@@ -482,7 +512,7 @@ function onSectionChange() {
   const ops = uniq(S.data.operations.filter(x => x.section === sec && !x.merged_into).map(x => x.operation));
   $('doperation').innerHTML = opts(ops.length ? ops : ['Не определена'], ops[0] || 'Не определена');
 }
-function onPriorityChange() { if ($('duehint')) $('duehint').textContent = 'Приоритет изменён — срок по умолчанию пересчитается после сохранения.'; }
+function onPriorityChange() { if ($('duehintbox')) refreshDue(); }
 function syncResolution() {
   const st = $('dstatus').value;
   $('resolvedbox').hidden = !RESOLVED.includes(st);
