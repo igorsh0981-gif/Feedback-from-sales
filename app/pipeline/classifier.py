@@ -215,6 +215,45 @@ def render_episode(ep: EpisodeInput) -> str:
     return "\n\n".join(parts)
 
 
+TOOL_REMINDER = "\n\nОтвет дай только вызовом инструмента submit_analysis, без текста вокруг."
+
+
+def extract_analysis(blocks) -> dict | None:
+    """Результат из tool_use, иначе — первый JSON-объект в текстовом ответе."""
+    for block in blocks:
+        if getattr(block, "type", "") == "tool_use" and getattr(block, "name", "") == TOOL["name"]:
+            data = block.input
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+            if isinstance(data, dict):
+                return data
+    for block in blocks:
+        if getattr(block, "type", "") != "text":
+            continue
+        text = getattr(block, "text", "") or ""
+        start = text.find("{")
+        while start != -1:
+            depth = 0
+            for i in range(start, len(text)):
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        try:
+                            data = json.loads(text[start:i + 1])
+                        except json.JSONDecodeError:
+                            break
+                        if isinstance(data, dict) and "kind" in data:
+                            return data
+                        break
+            start = text.find("{", start + 1)
+    return None
+
+
 class ClaudeClassifier:
     name = "claude"
 
@@ -232,18 +271,26 @@ class ClaudeClassifier:
                 "type": "image",
                 "source": {"type": "base64", "media_type": "image/jpeg", "data": base64.b64encode(img).decode()},
             })
-        resp = await self.client.messages.create(
-            model=self.model,
-            max_tokens=1500,
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            tools=[TOOL],
-            tool_choice={"type": "tool", "name": TOOL["name"]},
-            messages=[{"role": "user", "content": content}],
-        )
-        for block in resp.content:
-            if getattr(block, "type", "") == "tool_use":
-                data = block.input if isinstance(block.input, dict) else json.loads(block.input)
+        messages: list[dict] = [{"role": "user", "content": content}]
+        # Принудительный tool_choice поддерживают не все модели, поэтому auto + явная инструкция,
+        # а если инструмент не вызван — разбор JSON из текста или одна повторная просьба.
+        for attempt in range(2):
+            resp = await self.client.messages.create(
+                model=self.model,
+                max_tokens=4000,
+                system=[{"type": "text", "text": SYSTEM_PROMPT + TOOL_REMINDER, "cache_control": {"type": "ephemeral"}}],
+                tools=[TOOL],
+                tool_choice={"type": "auto"},
+                messages=messages,
+            )
+            data = extract_analysis(resp.content)
+            if data is not None:
                 return Analysis.from_dict(data)
+            messages = messages + [
+                {"role": "assistant", "content": [b.model_dump() if hasattr(b, "model_dump") else b for b in resp.content
+                                                  if getattr(b, "type", "") == "text"] or "—"},
+                {"role": "user", "content": "Вызови инструмент submit_analysis с результатом разбора."},
+            ]
         raise RuntimeError("Claude не вернул результат разбора")
 
     async def ping(self) -> None:
