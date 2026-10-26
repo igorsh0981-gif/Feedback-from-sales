@@ -521,14 +521,14 @@ function detailForm(d) {
     ${field('Раздел', `<select id="dsection" ${dis} onchange="onSectionChange()">${opts(o.sections, i.section)}</select>`)}
     ${field('Операция', `<select id="doperation" ${dis}>${opts(ops.length ? ops : ['Не определена'], i.operation || 'Не определена')}</select>`)}
     ${field('Платформа', `<select id="dplatform" ${dis}>${opts(o.platforms, i.platform)}</select>`)}
-    ${field('Версия приложения', `<input id="dversion" ${dis} value="${attr(i.app_version)}" placeholder="4.2.0">`)}
-    ${field('Устройство', `<input id="ddevice" ${dis} value="${attr(i.device)}" placeholder="Samsung A54">`)}
+    ${field('Версия приложения', `<input id="dversion" ${dis} value="${attr(i.app_version)}" placeholder="например, 4.2.0">`)}
+    ${field('Устройство', `<input id="ddevice" ${dis} value="${attr(i.device)}" placeholder="например, Samsung A54">`)}
     ${dueField(isBug, i.priority)}
   </div>
   <div id="duehintbox">${isBug ? dueHint(i.priority) + deadline(i) : ''}</div>
   ${field('Заголовок', `<input id="dtitle" ${dis} value="${attr(i.title)}" maxlength="120">`, true)}
   <div class="resolved-controls" id="resolvedbox" ${RESOLVED.includes(i.status) ? '' : 'hidden'}>
-    <div class="formgrid">${field('Дата устранения', `<input type="date" id="dresolvedAt" ${dis} value="${attr(i.resolved_at)}">`)}${field('Версия исправления', `<input id="dfix" ${dis} value="${attr(i.fix_version)}" placeholder="4.2.1">`)}</div>
+    <div class="formgrid">${field('Дата устранения', `<input type="date" id="dresolvedAt" ${dis} value="${attr(i.resolved_at)}">`)}${field('Версия исправления', `<input id="dfix" ${dis} list="releaselist" value="${attr(i.fix_version)}" placeholder="например, 4.2.1">`)}</div>
     ${field('Результат / что исправлено', `<textarea id="dresolution" rows="2" ${dis} placeholder="Решение и результат проверки">${esc(i.resolution)}</textarea>`, true)}
   </div>
   <div id="rejectbox" ${i.status === 'Отклонено' ? '' : 'hidden'}>${field('Причина отклонения', `<input id="dreject" ${dis} list="rejectlist" value="${attr(i.reject_reason)}"><datalist id="rejectlist">${o.reject_reasons.map(r => `<option value="${attr(r)}">`).join('')}</datalist>`, true)}${admin && i.status !== 'Отклонено' ? '<button class="danger" onclick="confirmReject()">Отклонить обращение</button>' : ''}</div>
@@ -565,7 +565,7 @@ function suggestedDue(priority) {
 }
 function dueField(isBug, priority, keepInput = false) {
   const i = S.detail.issue, admin = isAdmin(), dis = admin ? '' : 'disabled';
-  if (!isBug) return `<label class="field" id="duefield">Целевой релиз<input id="dfixplan" ${dis} value="${attr(i.fix_version)}" placeholder="4.3.0"></label>`;
+  if (!isBug) return `<label class="field" id="duefield">Целевой релиз<input id="dfixplan" ${dis} value="${attr(i.fix_version)}" placeholder="например, 4.3.0"></label>`;
   const keep = keepInput && $('ddue') && !$('ddue').dataset.auto ? $('ddue').value : '';
   const auto = !keep && !i.due && admin && i.review ? suggestedDue(priority) : '';
   const due = keep || i.due || auto;
@@ -596,12 +596,30 @@ function onSectionChange() {
   $('doperation').innerHTML = opts(ops.length ? ops : ['Не определена'], ops[0] || 'Не определена');
 }
 function onPriorityChange() { if ($('duehintbox')) refreshDue(); }
+// Последний вышедший релиз (по дате, не позже сегодня), иначе самый свежий заведённый.
+function latestReleaseVersion() {
+  const rel = [...S.data.releases].sort((a, b) => b.released_at.localeCompare(a.released_at));
+  return (rel.find(r => day(r.released_at) <= today()) || rel[0] || {}).version || '';
+}
 function syncResolution() {
   const st = $('dstatus').value;
   $('resolvedbox').hidden = !RESOLVED.includes(st);
   $('rejectbox').hidden = st !== 'Отклонено';
   $('answerbox').hidden = st !== 'Отвечено';
   if (RESOLVED.includes(st) && !$('dresolvedAt').value) $('dresolvedAt').value = today();
+  if (RESOLVED.includes(st) && $('dfix') && !$('dfix').value) $('dfix').value = latestReleaseVersion();
+  if (!$('releaselist')) document.body.insertAdjacentHTML('beforeend', '<datalist id="releaselist"></datalist>');
+  $('releaselist').innerHTML = uniq(S.data.releases.map(r => r.version)).map(v => `<option value="${attr(v)}">`).join('');
+}
+// Поле, не прошедшее проверку, — подсветить и поставить в него курсор.
+const ERROR_FIELDS = [['версию исправления', 'dfix'], ['дату устранения', 'dresolvedAt'], ['результат', 'dresolution'],
+  ['ответственного', 'downer'], ['срок', 'ddue'], ['причину', 'dreject'], ['ответ', 'danswer'], ['тип', 'dtype'], ['приоритет', 'dpriority']];
+function markErrors(errors) {
+  document.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+  const text = errors.join(' ').toLowerCase();
+  const ids = ERROR_FIELDS.filter(([w]) => text.includes(w)).map(([, id]) => id).filter(id => $(id) && !$(id).closest('[hidden]'));
+  ids.forEach(id => { $(id).classList.add('invalid'); $(id).addEventListener('input', () => $(id).classList.remove('invalid'), { once: true }); });
+  return ids[0];
 }
 function readForm() {
   const type = $('dtype').value, status = $('dstatus').value;
@@ -623,7 +641,13 @@ async function saveDetail(accept) {
     const r = await api('POST', `/api/issues/${encodeURIComponent(S.detailId)}/save`, { fields: readForm(), accept });
     S.detail = r; renderDetail(); await load(true);
     toast(accept ? 'Обращение принято и распределено' : 'Изменения сохранены');
-  } catch (e) { box.innerHTML = (e.errors || [e.message]).map(esc).join('<br>'); box.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  } catch (e) {
+    const errors = e.errors || [e.message];
+    box.innerHTML = errors.map(esc).join('<br>');
+    const first = markErrors(errors);
+    if (first) { $(first).scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => $(first).focus(), 300); }
+    else box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 function quickReject() {
   $('dstatus').value = 'Отклонено'; syncResolution();
@@ -781,7 +805,7 @@ function settingsPage() {
   ${S.data.releases.map((r, k) => S.editRelease === k && admin
     ? `<div class="settingrow"><div class="periodrow"><label>Версия<input id="erVersion" value="${attr(r.version)}"></label><label>Платформа<select id="erPlatform">${opts(['iOS и Android', 'iOS', 'Android'], r.platform)}</select></label><label>Дата выхода<input id="erDate" type="date" value="${attr(r.released_at.slice(0, 10))}"></label><button class="primary" onclick="saveRelease(${k})">Сохранить</button><button onclick="S.editRelease=null;render()">Отмена</button></div></div>`
     : `<div class="settingrow"><div><b>${esc(r.version)}</b> · ${esc(r.platform)}<p>Выход: ${showDate(r.released_at)} · завёл ${esc(r.created_by)}</p></div>${admin ? `<div class="mini-actions"><button onclick="S.editRelease=${k};render()">Изменить</button><button onclick="deleteRelease(${k})">Удалить</button></div>` : ''}</div>`).join('') || '<p class="small">Релизов пока нет.</p>'}
-  ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Версия<input id="relVersion" placeholder="4.2.1"></label><label>Платформа<select id="relPlatform">${opts(['iOS и Android', 'iOS', 'Android'])}</select></label><label>Дата выхода<input id="relDate" type="date" value="${today()}"></label><label class="checklabel"><input type="checkbox" id="relNotify"> Написать в личку участникам, которые запускали бота</label><button onclick="addRelease()">Завести релиз</button></div>` : ''}</section>
+  ${admin ? `<div class="periodrow" style="margin-top:14px"><label>Версия<input id="relVersion" placeholder="например, 4.2.1"></label><label>Платформа<select id="relPlatform">${opts(['iOS и Android', 'iOS', 'Android'])}</select></label><label>Дата выхода<input id="relDate" type="date" value="${today()}"></label><label class="checklabel"><input type="checkbox" id="relNotify"> Написать в личку участникам, которые запускали бота</label><button onclick="addRelease()">Завести релиз</button></div>` : ''}</section>
 
   <section class="panel settings" style="margin-top:20px"><h2>Интеграции и доступ</h2>
   <div class="settingrow"><div><b>Google Sheets</b><p>Хранилище всех данных. Проверка раз в час${m.health_checked_at ? ', последняя ' + showDT(m.health_checked_at) : ''}.</p></div><span class="badge ${h.sheets === 'ok' ? 'approved' : 'review'}">${esc(h.sheets || '—')}</span></div>
