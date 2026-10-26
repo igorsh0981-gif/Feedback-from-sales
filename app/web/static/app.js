@@ -7,7 +7,7 @@ const S = {
 };
 const F = {
   from: '', to: '', drill: '', platform: '', section: '', operation: '', type: '', version: '', priority: '',
-  status: '', owner: '', chat: '', exec: '', query: '', initiator: '', order: 'newest', group: 'platform',
+  status: '', owner: '', chat: '', exec: '', block: '', query: '', initiator: '', order: 'newest', group: 'exec',
 };
 const VIEWS = [
   ['◫', 'Обзор'], ['☷', 'Все обращения'], ['⚑', 'Баги'], ['✧', 'Пожелания и UX'], ['?', 'Вопросы'],
@@ -214,7 +214,19 @@ function viewItems() {
 }
 function textOf(i) { return `${i.issue_id} ${i.title} ${i.section} ${i.operation} ${i.summary} ${i.first_text}`.toLowerCase(); }
 function authorsOf(i) { return i.reporters.map(r => `${r.name} @${r.username} ${r.author_id}`).join(' ').toLowerCase(); }
+// Состояние исполнения — одно на обращение, для графика и фильтра.
+const EXEC_STATES = ['На утверждении', 'В работе', 'Просрочено', 'Устранено / реализовано', 'Отклонено'];
+const EXEC_COLORS = { 'На утверждении': '#d7b769', 'В работе': '#638fa5', 'Просрочено': '#c4553f', 'Устранено / реализовано': '#286546', 'Отклонено': '#a9aca4' };
+function execState(i) {
+  if (i.review) return 'На утверждении';
+  if (i.status === 'Отклонено') return 'Отклонено';
+  if (TERMINAL.includes(i.status)) return 'Устранено / реализовано';
+  return i.overdue ? 'Просрочено' : 'В работе';
+}
+const BLOCKS = ['Баги', 'Пожелания и UX', 'Вопросы'];
+const blockOf = i => i.type === 'Баг' ? 'Баги' : i.type === 'Вопрос' ? 'Вопросы' : 'Пожелания и UX';
 function matchesExec(i) {
+  if (EXEC_STATES.includes(F.exec)) return execState(i) === F.exec;
   switch (F.exec) {
     case 'open': return !TERMINAL.includes(i.status);
     case 'done': return RESOLVED.includes(i.status);
@@ -234,12 +246,13 @@ function scoped(ignoreDay = false, ignoreGroupFilter = '') {
     if (F.section && ignoreGroupFilter !== 'section' && i.section !== F.section) return false;
     if (F.operation && i.operation !== F.operation) return false;
     if (F.type && i.type !== F.type) return false;
+    if (F.block && ignoreGroupFilter !== 'type' && blockOf(i) !== F.block) return false;
     if (F.version && ignoreGroupFilter !== 'version' && (i.app_version || 'Не указана') !== F.version) return false;
     if (F.priority && i.priority !== F.priority) return false;
     if (F.status && (F.status === 'На утверждении' ? !i.review : (i.status !== F.status || i.review))) return false;
     if (F.owner && i.owner !== F.owner) return false;
     if (F.chat && !i.chats.includes(F.chat)) return false;
-    if (!matchesExec(i)) return false;
+    if (ignoreGroupFilter !== 'exec' && !matchesExec(i)) return false;
     if (F.query && !textOf(i).includes(F.query.toLowerCase())) return false;
     if (F.initiator && !authorsOf(i).includes(F.initiator.toLowerCase())) return false;
     return true;
@@ -278,7 +291,7 @@ function applyPeriod() {
 }
 function movePeriod(dir) { const n = Math.round((new Date(F.to) - new Date(F.from)) / 86400000) + 1; F.from = dateShift(F.from, n * dir); F.to = dateShift(F.to, n * dir); F.drill = ''; render(); }
 function setF(key, value) { F[key] = value; if (key !== 'order') F.drill = ''; if (key === 'section') F.operation = ''; render(); }
-function resetFilters() { Object.assign(F, { drill: '', platform: '', section: '', operation: '', type: '', version: '', priority: '', status: '', owner: '', chat: '', exec: '', query: '', initiator: '', order: 'newest' }); quickPeriod('week'); }
+function resetFilters() { Object.assign(F, { drill: '', platform: '', section: '', operation: '', type: '', version: '', priority: '', status: '', owner: '', chat: '', exec: '', block: '', query: '', initiator: '', order: 'newest' }); quickPeriod('week'); }
 
 function uniq(values) { return [...new Set(values.filter(Boolean))]; }
 function versionsList() {
@@ -310,8 +323,8 @@ function periodPanel() {
 }
 
 // Какие фильтры включены и сколько обращений раздела они прячут — чтобы счётчик и список не расходились молча.
-const FILTER_LABELS = { platform: 'Платформа', section: 'Раздел', operation: 'Операция', type: 'Тип', version: 'Версия', priority: 'Приоритет', status: 'Статус', owner: 'Ответственный', chat: 'Чат', exec: 'Исполнение', query: 'Поиск', initiator: 'Инициатор' };
-const EXEC_LABELS = { open: 'открытые', done: 'устранено / реализовано', late: 'просрочено', related: 'со связанной историей', unverified: 'скрин не проверен' };
+const FILTER_LABELS = { block: 'Блок', platform: 'Платформа', section: 'Раздел', operation: 'Операция', type: 'Тип', version: 'Версия', priority: 'Приоритет', status: 'Статус', owner: 'Ответственный', chat: 'Чат', exec: 'Исполнение', query: 'Поиск', initiator: 'Инициатор' };
+const EXEC_LABELS = { 'На утверждении': 'на утверждении', 'В работе': 'в работе', 'Просрочено': 'просрочено', 'Устранено / реализовано': 'устранено / реализовано', 'Отклонено': 'отклонено', open: 'открытые', done: 'устранено / реализовано', late: 'просрочено', related: 'со связанной историей', unverified: 'скрин не проверен' };
 function activeFilters() {
   return Object.keys(FILTER_LABELS).filter(k => F[k]).map(k => [k, FILTER_LABELS[k],
     k === 'chat' ? chatTitle(F.chat) : k === 'exec' ? EXEC_LABELS[F.exec] || F.exec : F[k]]);
@@ -359,23 +372,38 @@ function metrics(a) {
 
 // ---------------------------------------------------------------- график
 function colorFor(key, all) { return PALETTE[Math.max(0, all.indexOf(key)) % PALETTE.length]; }
+const CHART_GROUPS = {
+  exec: { label: 'По исполнению', key: 'exec', hint: 'по состоянию исполнения', field: execState, all: () => EXEC_STATES, color: s => EXEC_COLORS[s] },
+  type: { label: 'По блокам', key: 'block', hint: 'по блоку', field: blockOf, all: () => BLOCKS, color: s => ({ 'Баги': '#c4553f', 'Пожелания и UX': '#638fa5', 'Вопросы': '#9c88ad' })[s] },
+  platform: { label: 'По платформам', key: 'platform', hint: 'по платформе', field: i => i.platform || 'Не указана', all: () => S.data.options.platforms },
+  section: { label: 'По разделам', key: 'section', hint: 'по разделу', field: i => i.section, all: () => S.data.options.sections },
+  version: { label: 'По версиям', key: 'version', hint: 'по версии', field: i => i.app_version || 'Не указана', all: versionsList },
+};
+function chartGroup() {
+  const g = CHART_GROUPS[F.group] || CHART_GROUPS.exec, all = g.all();
+  return { ...g, all, color: g.color || (s => colorFor(s, all)) };
+}
 function chart() {
   const data = scoped(true, F.group);
   const days = []; for (let d = F.from; d <= F.to && days.length < 400; d = dateShift(d, 1)) days.push(d);
-  const field = F.group === 'platform' ? (i => i.platform || 'Не указана') : F.group === 'section' ? (i => i.section) : (i => i.app_version || 'Не указана');
-  const all = F.group === 'platform' ? S.data.options.platforms : F.group === 'section' ? S.data.options.sections : versionsList();
+  const G = chartGroup();
+  const field = G.field, all = G.all;
   const series = all.filter(s => data.some(i => field(i) === s));
-  const bins = days.map(d => ({ date: d, total: data.filter(i => day(i.created_at) === d).length, counts: series.map(s => data.filter(i => day(i.created_at) === d && field(i) === s).length) }));
+  const bins = days.map(d => {
+    const items = data.filter(i => day(i.created_at) === d);
+    return { date: d, total: items.length, done: items.filter(i => execState(i) === 'Устранено / реализовано').length,
+      counts: series.map(s => items.filter(i => field(i) === s).length) };
+  });
   const max = Math.max(1, ...bins.map(b => b.total));
-  const active = F.group === 'platform' ? F.platform : F.group === 'section' ? F.section : F.version;
+  const active = F[G.key];
   S.series = series;
-  return `<section class="panel" style="margin:20px 0"><div class="panelhead"><div><h2>Обращения по дням</h2><p class="chartsummary"><strong>${data.length}</strong> ${plural(data.length, 'обращение', 'обращения', 'обращений')} · ${showDate(F.from)} — ${showDate(F.to)}${active ? ' · ' + esc(active) : ''}</p></div><label class="small">Разбивка <select aria-label="Разбивка графика" onchange="setF('group',this.value)">${opts(['platform', 'section', 'version'], F.group, ['По платформам', 'По разделам', 'По версиям'])}</select></label></div>
-  <div class="chartscroll"><div class="dailychart" style="min-width:${Math.max(360, days.length * 51)}px">${bins.map(b => `<button class="daybutton ${F.drill === b.date ? 'picked' : ''}" aria-label="${showDate(b.date)}: ${b.total}" aria-pressed="${F.drill === b.date}" onclick="selectDay('${b.date}')" title="${showDate(b.date)} · ${series.map((s, j) => s + ': ' + b.counts[j]).join('; ') || 'Нет обращений'}"><span class="daytotal">${b.total}</span><span class="daystack">${b.counts.map((n, j) => n ? `<span class="segment" style="height:${n / max * 165}px;background:${colorFor(series[j], all)}"></span>` : '').join('')}</span><span class="daydate">${showDate(b.date).slice(0, 5)}</span></button>`).join('')}</div></div>
-  <div class="chartlegend">${series.map((s, k) => `<button class="${active === s ? 'active' : ''}" onclick="filterSeries(${k})"><i style="background:${colorFor(s, all)}"></i>${esc(s)} · ${data.filter(i => field(i) === s).length}</button>`).join('')}</div>
-  <p class="chart-hint">Уникальные обращения по дате выявления, а не сообщения. Нажмите столбец — обращения за день; легенду — фильтр по ${F.group === 'platform' ? 'платформе' : F.group === 'section' ? 'разделу' : 'версии'}.${!data.length ? ' <b>За период и фильтры обращений нет.</b>' : ''}</p></section>`;
+  return `<section class="panel" style="margin:20px 0"><div class="panelhead"><div><h2>Обращения по дням</h2><p class="chartsummary"><strong>${data.length}</strong> ${plural(data.length, 'обращение', 'обращения', 'обращений')} · ${showDate(F.from)} — ${showDate(F.to)}${active ? ' · ' + esc(active) : ''}</p></div><label class="small">Разбивка <select aria-label="Разбивка графика" onchange="setF('group',this.value)">${opts(Object.keys(CHART_GROUPS), F.group, Object.values(CHART_GROUPS).map(g => g.label))}</select></label></div>
+  <div class="chartscroll"><div class="dailychart" style="min-width:${Math.max(360, days.length * 51)}px">${bins.map(b => `<button class="daybutton ${F.drill === b.date ? 'picked' : ''}" aria-label="${showDate(b.date)}: ${b.total}" aria-pressed="${F.drill === b.date}" onclick="selectDay('${b.date}')" title="${showDate(b.date)} · ${series.map((s, j) => s + ': ' + b.counts[j]).join('; ') || 'Нет обращений'}"><span class="daytotal">${b.total}</span>${F.group !== 'exec' && b.done ? `<span class="daydone" title="Устранено / реализовано">✓ ${b.done}</span>` : ''}<span class="daystack">${b.counts.map((n, j) => n ? `<span class="segment" style="height:${n / max * 165}px;background:${G.color(series[j])}"></span>` : '').join('')}</span><span class="daydate">${showDate(b.date).slice(0, 5)}</span></button>`).join('')}</div></div>
+  <div class="chartlegend">${series.map((s, k) => `<button class="${active === s ? 'active' : ''}" onclick="filterSeries(${k})"><i style="background:${G.color(s)}"></i>${esc(s)} · ${data.filter(i => field(i) === s).length}</button>`).join('')}</div>
+  <p class="chart-hint">Уникальные обращения по дате выявления, а не сообщения. Нажмите столбец — обращения за день; легенду — фильтр ${G.hint}.${F.group !== 'exec' ? ' ✓ над столбцом — сколько из них устранено или реализовано.' : ''}${!data.length ? ' <b>За период и фильтры обращений нет.</b>' : ''}</p></section>`;
 }
 function selectDay(d) { F.drill = F.drill === d ? '' : d; render(); $('registry')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-function filterSeries(k) { const s = S.series[k]; const key = F.group === 'platform' ? 'platform' : F.group === 'section' ? 'section' : 'version'; F[key] = F[key] === s ? '' : s; F.drill = ''; render(); }
+function filterSeries(k) { const s = S.series[k], key = chartGroup().key; F[key] = F[key] === s ? '' : s; F.drill = ''; render(); }
 
 // ---------------------------------------------------------------- реестр
 function badge(t) { return `<span class="badge ${t === 'Баг' ? 'bug' : t === 'UX' ? 'ux' : t === 'Вопрос' ? 'question' : 'wish'}">${esc(t)}</span>`; }
