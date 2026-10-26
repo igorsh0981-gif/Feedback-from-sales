@@ -362,7 +362,7 @@ function metrics(a) {
   const bugs = a.filter(i => i.type === 'Баг'), wishes = a.filter(i => ['Пожелание', 'UX'].includes(i.type)), qs = a.filter(i => i.type === 'Вопрос');
   const crit = bugs.filter(i => i.priority === 'Критичный' && !TERMINAL.includes(i.status)).length;
   const cards = [
-    ['Всего обращений', a.length, foot(a), "go('Все обращения', true)", `${a.reduce((s, i) => s + i.msg_count, 0)} сообщений · ${new Set(a.flatMap(i => i.reporters.map(r => r.author_id))).size} участников`],
+    ['Всего обращений', a.length, foot(a), "go('Все обращения', true)", (n => `${n} ${plural(n, 'участник', 'участника', 'участников')}`)(new Set(a.flatMap(i => i.reporters.map(r => r.author_id))).size)],
     ['Баги', bugs.length, foot(bugs), "go('Баги', true)", crit ? `критичных открытых: ${crit}` : ''],
     ['Пожелания и UX', wishes.length, foot(wishes), "go('Пожелания и UX', true)", ''],
     ['Вопросы', qs.length, foot(qs), "go('Вопросы', true)", ''],
