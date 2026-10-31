@@ -117,7 +117,7 @@ function renderFrame() {
   // Меню пользователя в шапке — выход доступен на любом размере экрана, даже если боковая панель не помещается.
   const who = me.link ? (S.actor || 'Гость') : me.admin ? me.name : 'Наблюдатель';
   const role = me.link ? 'Редактирование по ссылке' : me.admin ? 'Администратор' : 'Только просмотр';
-  const action = me.link ? `<button onclick="toggleUserMenu(false);openNameModal()">${S.actor ? 'Сменить имя' : 'Представиться'}</button>`
+  const action = me.link ? `<button onclick="toggleUserMenu(false);openNameModal()">${S.actor ? 'Сменить имя' : 'Представиться'}</button><button onclick="toggleUserMenu(false);openLogin()">Войти как администратор</button>`
     : me.admin ? '<button onclick="toggleUserMenu(false);logout()">Выйти</button>'
     : '<button onclick="toggleUserMenu(false);openLogin()">Войти</button>';
   $('topright').innerHTML = `<span class="demo">${m.demo ? 'ДЕМО' : 'FOCUS PULSE'}</span><span class="small">${showDate(m.now)}</span>
@@ -170,7 +170,9 @@ async function runAnalysis() {
 function openLogin() {
   const m = S.data.meta;
   $('logincontent').innerHTML = `<button class="close" onclick="closeModal('loginmodal')" aria-label="Закрыть">✕</button><span class="ailabel">ВХОД АДМИНИСТРАТОРА</span><h2>Войти через Telegram</h2>
-  <ol class="loginsteps"><li>Откройте бота${m.bot_username ? ` <a href="https://t.me/${attr(m.bot_username)}" target="_blank" rel="noopener">@${esc(m.bot_username)}</a>` : ''}.</li><li>Отправьте команду <code>/login</code>.</li><li>Откройте присланную ссылку — она действует 10 минут.</li></ol>
+  ${m.bot_username ? `<p><a class="primary buttonlink" href="https://t.me/${attr(m.bot_username)}?start=login" target="_blank" rel="noopener">Получить ссылку в Telegram</a></p>
+  <p class="small">Откроется бот @${esc(m.bot_username)} и сразу пришлёт ссылку для входа. Откройте её в этом браузере и нажмите «Войти». Ссылка действует 15 минут.</p>`
+  : '<ol class="loginsteps"><li>Откройте бота.</li><li>Отправьте команду <code>/login</code>.</li><li>Откройте присланную ссылку — она действует 15 минут.</li></ol>'}
   <p class="small">Вход доступен только Telegram-аккаунтам из списка администраторов.</p>
   ${m.login_widget ? '<div id="tgwidget" style="margin-top:14px"></div>' : ''}
   ${m.demo ? '<p><a class="primary buttonlink" href="/auth/demo">Войти как демо-администратор</a></p>' : ''}`;

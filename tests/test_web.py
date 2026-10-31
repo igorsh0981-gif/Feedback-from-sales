@@ -201,3 +201,28 @@ async def test_release_edit_and_delete(aiohttp_client):
     assert r.status == 422
     r = await client.post("/api/releases/delete", json={"version": "4.3.0", "platform": "Android"}, headers=H)
     assert r.status == 200 and repo.get("Releases", "4.3.0", "Android") is None
+
+
+async def test_login_link_confirm_page_and_forbidden_page(aiohttp_client):
+    from app.bot.handlers import LoginTokens
+    repo = Repo(MemoryBackend())
+    await repo.init()
+    tokens = LoginTokens("s")
+    cfg = Config(demo_mode=False, session_secret="s", view_token="abc", open_edit=True, admin_ids={42})
+    ctx = AppContext(repo=repo, cfg=cfg, analyzer=Analyzer(repo, HeuristicClassifier()), tokens=tokens,
+                     is_admin=lambda uid: uid == 42, bot_username="FeedbackM3_bot", classifier_name="h")
+    client = await aiohttp_client(create_app(ctx))
+    # без токена — страница с кнопкой входа администратора через бота
+    r = await client.get("/")
+    assert r.status == 403 and "t.me/FeedbackM3_bot?start=login" in await r.text()
+    # GET ссылки не расходует токен (предпросмотр Telegram, антивирус)
+    t = tokens.issue(42, "Игорь")
+    for _ in range(2):
+        r = await client.get(f"/auth/link?t={t}")
+        assert r.status == 200 and "Войти" in await r.text()
+    r = await client.post("/auth/link", data={"t": t}, allow_redirects=False)
+    assert r.status == 302
+    state = await (await client.get("/api/state", headers={"X-FP-Build": __import__("app.web.server", fromlist=["BUILD"]).BUILD})).json()
+    assert state["me"]["admin"] and not state["me"]["link"] and state["me"]["share"]["path"] == "/?k=abc"
+    r = await client.post("/auth/link", data={"t": t}, allow_redirects=False)
+    assert r.status == 403

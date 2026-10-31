@@ -221,7 +221,7 @@ class Runtime:
         )
         from .bot.handlers import LoginTokens, is_admin
 
-        tokens = LoginTokens()
+        tokens = LoginTokens(cfg.session_secret)
         ctx = AppContext(
             repo=self.repo, cfg=cfg, analyzer=self.analyzer, tokens=tokens,
             image_fetcher=self.download if self.bot else None,

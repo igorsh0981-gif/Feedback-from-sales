@@ -28,25 +28,58 @@ VERSION_RE = re.compile(r"^\d+(?:\.\d+){1,3}$")
 
 
 class LoginTokens:
-    """Одноразовые ссылки входа админа на дашборд (команда /login)."""
+    """Одноразовые ссылки входа админа на дашборд (команда /login).
 
-    TTL = 600
+    Токен подписан секретом сервиса, поэтому переживает перезапуск. Одноразовость — по списку
+    использованных токенов в памяти; срок жизни короткий.
+    """
 
-    def __init__(self) -> None:
-        self._tokens: dict[str, tuple[int, str, float]] = {}
+    TTL = 900
+
+    def __init__(self, secret: str = "") -> None:
+        import hashlib
+        self._secret = (secret or secrets.token_hex(16)).encode()
+        self._hash = hashlib.sha256
+        self._used: dict[str, float] = {}
+
+    def _sign(self, payload: str) -> str:
+        import base64
+        import hmac
+        return base64.urlsafe_b64encode(hmac.new(self._secret, payload.encode(), self._hash).digest()[:18]).decode().rstrip("=")
 
     def issue(self, user_id: int, name: str) -> str:
-        now = time.time()
-        self._tokens = {t: v for t, v in self._tokens.items() if v[2] > now}
-        token = secrets.token_urlsafe(24)
-        self._tokens[token] = (user_id, name, now + self.TTL)
-        return token
+        import base64
+        import json
+        body = json.dumps({"u": user_id, "n": name[:60], "e": int(time.time()) + self.TTL, "r": secrets.token_hex(4)},
+                          ensure_ascii=False)
+        payload = base64.urlsafe_b64encode(body.encode()).decode().rstrip("=")
+        return f"{payload}.{self._sign(payload)}"
+
+    def peek(self, token: str) -> tuple[int, str] | None:
+        """Проверка без расходования — для страницы подтверждения входа."""
+        import base64
+        import hmac
+        import json
+        if not token or "." not in token or token in self._used:
+            return None
+        payload, sig = token.rsplit(".", 1)
+        if not hmac.compare_digest(sig, self._sign(payload)):
+            return None
+        try:
+            data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
+        except (ValueError, json.JSONDecodeError):
+            return None
+        if not isinstance(data, dict) or data.get("e", 0) < time.time():
+            return None
+        return int(data.get("u", -1)), str(data.get("n", ""))
 
     def consume(self, token: str) -> tuple[int, str] | None:
-        item = self._tokens.pop(token, None)
-        if not item or item[2] < time.time():
-            return None
-        return item[0], item[1]
+        item = self.peek(token)
+        if item:
+            now = time.time()
+            self._used = {t: exp for t, exp in self._used.items() if exp > now}
+            self._used[token] = now + self.TTL
+        return item
 
 
 class Registration(StatesGroup):
@@ -188,8 +221,26 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
                 log.info("Не удалось уведомить админа %s", uid)
 
     # ------------------------------------------------------------ личка: регистрация
+    async def send_login_link(message: Message) -> None:
+        if not user_is_admin(repo, cfg, message.from_user):
+            await message.answer("Вход на дашборд доступен только администраторам.")
+            return
+        if not cfg.dashboard_url:
+            await message.answer("Не задан DASHBOARD_URL — не могу сформировать ссылку.")
+            return
+        token = tokens.issue(message.from_user.id, message.from_user.full_name)
+        await message.answer(
+            "Ссылка для входа на дашборд (одноразовая, 15 минут). Откройте её в том браузере, где будете работать; "
+            "если она открылась внутри Telegram — нажмите «⋯ → Открыть в браузере».\n"
+            f"{cfg.dashboard_url}/auth/link?t={token}",
+            disable_web_page_preview=True,
+        )
+
     @router.message(CommandStart(), F.chat.type == ChatType.PRIVATE, admin_only)
-    async def start(message: Message, state: FSMContext) -> None:
+    async def start(message: Message, state: FSMContext, command: CommandObject) -> None:
+        if (command.args or "").strip() == "login":  # кнопка «Войти как администратор» на дашборде
+            await send_login_link(message)
+            return
         await state.clear()
         _ensure_participant(repo, message)
         await repo.commit()
@@ -258,17 +309,7 @@ def build_router(repo: Repo, cfg: Config, collector: Collector, analyzer: Analyz
     # ------------------------------------------------------------ личка: админ
     @router.message(Command("login"), F.chat.type == ChatType.PRIVATE, admin_only)
     async def login(message: Message) -> None:
-        if not user_is_admin(repo, cfg, message.from_user):
-            await message.answer("Вход на дашборд доступен только администраторам.")
-            return
-        if not cfg.dashboard_url:
-            await message.answer("Не задан DASHBOARD_URL — не могу сформировать ссылку.")
-            return
-        token = tokens.issue(message.from_user.id, message.from_user.full_name)
-        await message.answer(
-            f"Ссылка для входа (одноразовая, 10 минут):\n{cfg.dashboard_url}/auth/link?t={token}",
-            disable_web_page_preview=True,
-        )
+        await send_login_link(message)
 
     @router.message(Command("run"), F.chat.type == ChatType.PRIVATE, admin_only)
     async def run_now(message: Message) -> None:

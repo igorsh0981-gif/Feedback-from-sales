@@ -99,6 +99,16 @@ async def test_connect_collect_register_login():
     token = link.split("t=")[1].strip()
     assert tokens.consume(token) == (ADMIN, "Игорь")
     assert tokens.consume(token) is None
+    # кнопка «Войти как администратор» на дашборде: /start login сразу присылает ссылку
+    await dp.feed_update(bot, upd(14, ADMIN, "private", ADMIN, "/start login"))
+    texts = [m.text for m in session.sent if isinstance(m, SendMessage)]
+    assert sum("/auth/link?t=" in t for t in texts) == 2
+    # токен подписан: другой экземпляр с тем же секретом (перезапуск сервиса) его принимает
+    from app.bot.handlers import LoginTokens as LT
+    a, b = LT("secret"), LT("secret")
+    t2 = a.issue(ADMIN, "Игорь")
+    assert b.peek(t2) == (ADMIN, "Игорь") and b.consume(t2) and not b.consume(t2)
+    assert LT("other").peek(t2) is None and a.peek(t2[:-2] + "xx") is None
     assert any("Не похоже на номер версии" in t for t in texts)
 
 

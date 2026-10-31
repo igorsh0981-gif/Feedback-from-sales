@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+from html import escape as html_escape
 from collections import OrderedDict
 from urllib.parse import unquote
 from dataclasses import dataclass, field
@@ -266,7 +268,7 @@ def state_payload(ctx: AppContext, admin: dict | None) -> dict:
             "auto": repo.setting_on("auto_analysis"), "interval_min": an.interval_min, "pause_min": an.pause_min,
             "calls_today": an.calls_today(), "daily_limit": an.daily_limit, "health": ctx.health.status,
             "health_checked_at": ctx.health.checked_at, "queued": sum(1 for m in repo.rows("Messages") if m.get("state") == MSG_QUEUED),
-            "now": iso(), "login_widget": bool(ctx.bot_username and not ctx.cfg.demo_mode),
+            "now": iso(), "login_widget": bool(ctx.bot_username and not ctx.cfg.demo_mode and os.getenv("TELEGRAM_LOGIN_WIDGET") == "1"),
             "pending_writes": repo.pending_changes,
         },
         "options": {
@@ -331,9 +333,9 @@ async def view_guard(request: web.Request, handler):
         return resp
     if request.path.startswith("/api/"):
         raise web.HTTPForbidden(text="Нужна ссылка на дашборд")
-    return web.Response(status=403, content_type="text/html", text=(
-        "<!doctype html><meta charset=utf-8><title>Focus Pulse</title>"
-        "<p style='font:16px sans-serif;padding:40px'>Откройте дашборд по полной ссылке, которую прислал администратор.</p>"))
+    return _page("<h2 style='margin-top:0'>Focus Pulse</h2><p>Откройте дашборд по полной ссылке, которую прислал "
+                 "администратор (с <code>?k=…</code> в конце).</p><hr style='border:0;border-top:1px solid #e6e9e3;margin:20px 0'>"
+                 + _bot_login_button(ctx), 403)
 
 
 @web.middleware
@@ -734,14 +736,45 @@ def _set_session(resp: web.StreamResponse, ctx: AppContext, uid: int, name: str,
                     httponly=True, samesite="Lax", secure=secure)
 
 
+def _page(body: str, status: int = 200) -> web.Response:
+    return web.Response(status=status, content_type="text/html", headers={"Cache-Control": "no-store"}, text=(
+        "<!doctype html><html lang=ru><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+        "<title>Focus Pulse</title><body style='font:16px/1.6 Inter,Arial,sans-serif;background:#f5f6f2;color:#202924;"
+        "margin:0;padding:40px 16px'><div style='max-width:520px;margin:auto;background:#fff;border:1px solid #e6e9e3;"
+        "border-radius:12px;padding:28px'>" + body + "</div></body></html>"))
+
+
+_BTN = ("display:inline-block;background:#286546;color:#fff;border:0;border-radius:8px;padding:12px 18px;"
+        "font:inherit;cursor:pointer;text-decoration:none")
+
+
+def _bot_login_button(ctx: AppContext) -> str:
+    if not ctx.bot_username:
+        return "<p>Администратор: отправьте боту команду <b>/login</b> и откройте ссылку из ответа.</p>"
+    return (f"<p><a style='{_BTN}' href='https://t.me/{html_escape(ctx.bot_username)}?start=login'>"
+            "Я администратор — войти через Telegram</a></p><p style='color:#78817b;font-size:13px'>"
+            "Откроется бот и пришлёт ссылку для входа. Можно и так: отправьте боту /login.</p>")
+
+
 async def auth_link(request: web.Request) -> web.Response:
+    """GET показывает кнопку «Войти», вход — по POST. Так ссылку не «съедают» предпросмотр Telegram,
+    предзагрузка браузера и проверка ссылок антивирусом."""
     ctx = request.app[CTX]
-    item = ctx.tokens.consume(request.query.get("t", "")) if ctx.tokens else None
+    token = request.query.get("t", "")
+    if request.method == "POST":
+        form = await request.post()
+        token = str(form.get("t", ""))
+    item = (ctx.tokens.consume(token) if request.method == "POST" else ctx.tokens.peek(token)) if ctx.tokens else None
     if not item:
-        return web.Response(status=403, content_type="text/html", text=(
-            "<!doctype html><meta charset=utf-8><p style='font:16px sans-serif;padding:40px'>"
-            "Ссылка для входа недействительна или устарела. Отправьте боту /login ещё раз.</p>"))
+        return _page("<h2 style='margin-top:0'>Ссылка для входа недействительна или устарела</h2>"
+                     "<p>Получите новую — она действует 15 минут и только один раз.</p>" + _bot_login_button(ctx), 403)
     uid, name = item
+    if request.method != "POST":
+        return _page(f"<h2 style='margin-top:0'>Вход на дашборд Focus Pulse</h2><p>Вы входите как <b>{html_escape(name)}</b>.</p>"
+                     f"<form method=post action='/auth/link'><input type=hidden name=t value='{html_escape(token)}'>"
+                     f"<button style='{_BTN}' type=submit>Войти</button></form>"
+                     "<p style='color:#78817b;font-size:13px'>Вход сохранится в этом браузере на 7 дней. "
+                     "Если страница открылась внутри Telegram, сначала откройте её в обычном браузере (⋯ → «Открыть в браузере»).</p>")
     resp = _redirect("/")
     _set_session(resp, ctx, uid, name, request.secure)
     if ctx.cfg.view_token:
@@ -828,6 +861,7 @@ def create_app(ctx: AppContext) -> web.Application:
     app.router.add_post("/api/reload", api_reload)
     app.router.add_get("/api/image/{msg_id}/{idx}", api_image)
     app.router.add_get("/auth/link", auth_link)
+    app.router.add_post("/auth/link", auth_link)
     app.router.add_get("/auth/demo", auth_demo)
     app.router.add_post("/api/auth/telegram", auth_telegram)
     app.router.add_post("/api/logout", auth_logout)
